@@ -187,6 +187,21 @@ app.get('/api/tickets/:id/qr', authenticateToken, async (req, res) => {
   }
 });
 
+// Public QR image endpoint (PNG). Allows sharing the QR via link.
+app.get('/api/tickets/:id/qr.png', async (req, res) => {
+  try {
+    const ticket = await Ticket.findById(req.params.id);
+    if (!ticket) {
+      return res.status(404).send('Not found');
+    }
+    const buffer = await QRCode.toBuffer(ticket.qr_code, { type: 'png' });
+    res.set('Content-Type', 'image/png');
+    res.send(buffer);
+  } catch (e) {
+    res.status(500).send('Failed to render QR');
+  }
+});
+
 // Get user's tickets
 app.get('/api/tickets', authenticateToken, async (req, res) => {
   try {
