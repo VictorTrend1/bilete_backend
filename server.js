@@ -33,6 +33,8 @@ const userSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true, trim: true },
   email: { type: String, required: false, unique: false, lowercase: true, trim: true },
   password: { type: String, required: true },
+  referralCode: { type: String, required: true, unique: true },
+  referredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false },
 }, { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 
 const ticketSchema = new mongoose.Schema({
@@ -47,6 +49,11 @@ const ticketSchema = new mongoose.Schema({
   qr_code: { type: String, required: true, unique: true },
   verified: { type: Boolean, default: false },
 }, { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
+
+// Generate unique referral code
+function generateReferralCode() {
+  return Math.random().toString(36).substring(2, 8).toUpperCase();
+}
 
 const User = mongoose.model('User', userSchema);
 const Ticket = mongoose.model('Ticket', ticketSchema);
@@ -73,17 +80,51 @@ const authenticateToken = (req, res, next) => {
 
 // User registration
 app.post('/api/register', async (req, res) => {
-  const { username, email, password } = req.body;
+  const { username, email, password, referralCode } = req.body;
 
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password are required' });
   }
 
   try {
+    let referredBy = null;
+    
+    // Check if referral code is provided and valid
+    if (referralCode) {
+      const referrer = await User.findOne({ referralCode: referralCode.toUpperCase() });
+      if (!referrer) {
+        return res.status(400).json({ error: 'Invalid referral code' });
+      }
+      referredBy = referrer._id;
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await User.create({ username, email: email || null, password: hashedPassword });
+    let userReferralCode = generateReferralCode();
+    
+    // Ensure referral code is unique
+    while (await User.findOne({ referralCode: userReferralCode })) {
+      userReferralCode = generateReferralCode();
+    }
+
+    const user = await User.create({ 
+      username, 
+      email: email || null, 
+      password: hashedPassword,
+      referralCode: userReferralCode,
+      referredBy
+    });
+    
     const token = jwt.sign({ id: user._id, username: user.username, email: user.email || null }, JWT_SECRET, { expiresIn: '24h' });
-    res.json({ message: 'User created successfully', token, user: { id: user._id, username: user.username, email: user.email } });
+    res.json({ 
+      message: 'User created successfully', 
+      token, 
+      user: { 
+        id: user._id, 
+        username: user.username, 
+        email: user.email,
+        referralCode: user.referralCode
+      } 
+    });
   } catch (error) {
     if (error.code === 11000) {
       return res.status(400).json({ error: 'Username or email already exists' });
@@ -202,10 +243,10 @@ app.get('/api/tickets/:id/qr.png', async (req, res) => {
   }
 });
 
-// Get user's tickets
+// Get all tickets (visible to all logged-in users)
 app.get('/api/tickets', authenticateToken, async (req, res) => {
   try {
-    const tickets = await Ticket.find({ user_id: req.user.id }).sort({ created_at: -1 });
+    const tickets = await Ticket.find({}).populate('user_id', 'username').sort({ created_at: -1 });
     res.json({ tickets });
   } catch (error) {
     res.status(500).json({ error: 'Database error' });
