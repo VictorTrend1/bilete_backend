@@ -283,6 +283,19 @@ app.post('/api/verify-ticket', async (req, res) => {
   }
 });
 
+// Get current user info including referral code
+app.get('/api/user/profile', authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('username email referralCode');
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json({ user });
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 // Get all tickets (for admin/organizer view)
 app.get('/api/admin/tickets', authenticateToken, async (req, res) => {
   try {
