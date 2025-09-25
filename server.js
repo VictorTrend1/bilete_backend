@@ -31,7 +31,7 @@ mongoose.connect(process.env.MONGODB_URI || MONGODB_URI, {
 // Mongoose Schemas and Models
 const userSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true, trim: true },
-  email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+  email: { type: String, required: false, unique: false, lowercase: true, trim: true },
   password: { type: String, required: true },
 }, { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 
@@ -75,14 +75,14 @@ const authenticateToken = (req, res, next) => {
 app.post('/api/register', async (req, res) => {
   const { username, email, password } = req.body;
 
-  if (!username || !email || !password) {
-    return res.status(400).json({ error: 'All fields are required' });
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password are required' });
   }
 
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await User.create({ username, email, password: hashedPassword });
-    const token = jwt.sign({ id: user._id, username: user.username, email: user.email }, JWT_SECRET, { expiresIn: '24h' });
+    const user = await User.create({ username, email: email || null, password: hashedPassword });
+    const token = jwt.sign({ id: user._id, username: user.username, email: user.email || null }, JWT_SECRET, { expiresIn: '24h' });
     res.json({ message: 'User created successfully', token, user: { id: user._id, username: user.username, email: user.email } });
   } catch (error) {
     if (error.code === 11000) {
@@ -162,6 +162,28 @@ app.post('/api/tickets', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Duplicate ticket QR code' });
     }
     res.status(500).json({ error: 'Error generating or saving ticket' });
+  }
+});
+
+// Serve QR image for a ticket by id (auth required)
+app.get('/api/tickets/:id/qr', authenticateToken, async (req, res) => {
+  try {
+    const ticket = await Ticket.findOne({ _id: req.params.id, user_id: req.user.id });
+    if (!ticket) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+    const qrCodeDataURL = await QRCode.toDataURL(ticket.qr_code);
+    res.json({
+      ticket: {
+        id: ticket._id,
+        nume: ticket.nume,
+        telefon: ticket.telefon,
+        tip_bilet: ticket.tip_bilet
+      },
+      qr_code: qrCodeDataURL
+    });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to load ticket QR' });
   }
 });
 
