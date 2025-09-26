@@ -50,6 +50,12 @@ const ticketSchema = new mongoose.Schema({
   },
   qr_code: { type: String, required: true, unique: true },
   verified: { type: Boolean, default: false },
+  verification_count: { type: Number, default: 0 },
+  verification_history: [{
+    timestamp: { type: Date, default: Date.now },
+    verified: { type: Boolean, default: true }
+  }],
+  flagged: { type: Boolean, default: false }
 }, { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 
 
@@ -311,10 +317,50 @@ app.post('/api/verify-ticket', async (req, res) => {
 
   try {
     JSON.parse(qrData);
-    const ticket = await Ticket.findOneAndUpdate({ qr_code: qrData }, { verified: true }, { new: true });
+    const ticket = await Ticket.findOne({ qr_code: qrData });
+    
     if (!ticket) {
       return res.status(404).json({ error: 'Ticket not found' });
     }
+
+    // Increment verification count
+    ticket.verification_count += 1;
+    
+    // Add to verification history
+    ticket.verification_history.push({
+      timestamp: new Date(),
+      verified: true
+    });
+
+    // Check if ticket has been verified multiple times (fraud detection)
+    if (ticket.verification_count >= 2) {
+      ticket.flagged = true;
+      ticket.verified = true;
+      await ticket.save();
+      
+      return res.json({
+        message: 'Ticket verified successfully',
+        warning: '⚠️ ATENȚIE: Acest bilet a fost deja validat anterior!',
+        flagged: true,
+        verification_count: ticket.verification_count,
+        ticket: {
+          id: ticket._id,
+          nume: ticket.nume,
+          telefon: ticket.telefon,
+          tip_bilet: ticket.tip_bilet,
+          verified: ticket.verified,
+          verification_count: ticket.verification_count,
+          flagged: ticket.flagged,
+          first_verified: ticket.verification_history[0]?.timestamp,
+          created_at: ticket.created_at
+        }
+      });
+    }
+
+    // Mark as verified for first time
+    ticket.verified = true;
+    await ticket.save();
+
     res.json({
       message: 'Ticket verified successfully',
       ticket: {
@@ -323,10 +369,12 @@ app.post('/api/verify-ticket', async (req, res) => {
         telefon: ticket.telefon,
         tip_bilet: ticket.tip_bilet,
         verified: ticket.verified,
+        verification_count: ticket.verification_count,
         created_at: ticket.created_at
       }
     });
   } catch (error) {
+    console.error('Ticket verification error:', error);
     res.status(400).json({ error: 'Invalid QR code data' });
   }
 });
