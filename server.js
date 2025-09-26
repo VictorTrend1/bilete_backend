@@ -73,34 +73,86 @@ const authenticateToken = (req, res, next) => {
 
 // User registration
 app.post('/api/register', async (req, res) => {
-  const { username, password } = req.body;
-
-  if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password are required' });
-  }
-
   try {
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const { username, password } = req.body;
 
-    const user = await User.create({ 
-      username, 
+    // Validate input
+    if (!username || !password) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Username and password are required' 
+      });
+    }
+
+    if (username.length < 3) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Username must be at least 3 characters long' 
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Password must be at least 6 characters long' 
+      });
+    }
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ username: username.trim() });
+    if (existingUser) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Username already exists. Please choose a different username.' 
+      });
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    // Create new user
+    const newUser = new User({
+      username: username.trim(),
       password: hashedPassword
     });
+
+    await newUser.save();
     
-    const token = jwt.sign({ id: user._id, username: user.username }, JWT_SECRET, { expiresIn: '24h' });
-    res.json({ 
-      message: 'User created successfully', 
+    // Generate JWT token
+    const token = jwt.sign(
+      { 
+        id: newUser._id, 
+        username: newUser.username 
+      }, 
+      JWT_SECRET, 
+      { expiresIn: '24h' }
+    );
+
+    // Return success response
+    res.status(201).json({ 
+      success: true,
+      message: 'User registered successfully', 
       token, 
       user: { 
-        id: user._id, 
-        username: user.username
+        id: newUser._id, 
+        username: newUser.username
       } 
     });
+
   } catch (error) {
+    console.error('Registration error:', error);
+    
     if (error.code === 11000) {
-      return res.status(400).json({ error: 'Username already exists' });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Username already exists. Please choose a different username.' 
+      });
     }
-    res.status(500).json({ error: 'Server error' });
+    
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error during registration' 
+    });
   }
 });
 
