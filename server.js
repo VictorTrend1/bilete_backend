@@ -81,7 +81,7 @@ app.post('/api/register', async (req, res) => {
 
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await User.create({ username, email: email || null, password: hashedPassword });
+    const user = await User.create({ username, password: hashedPassword });
     const token = jwt.sign({ id: user._id, username: user.username, email: user.email || null }, JWT_SECRET, { expiresIn: '24h' });
     res.json({ 
       message: 'User created successfully', 
