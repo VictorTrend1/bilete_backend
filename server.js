@@ -32,13 +32,10 @@ mongoose.connect(process.env.MONGODB_URI || MONGODB_URI, {
 const userSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true, trim: true },
   password: { type: String, required: true },
-  group: { type: String, required: true, trim: true },
-  referralCode: { type: String, required: true, unique: true },
 }, { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 
 const ticketSchema = new mongoose.Schema({
   user_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  group: { type: String, required: true, trim: true },
   nume: { type: String, required: true, trim: true },
   telefon: { type: String, required: true, trim: true },
   tip_bilet: { 
@@ -50,16 +47,6 @@ const ticketSchema = new mongoose.Schema({
   verified: { type: Boolean, default: false },
 }, { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 
-// Group mapping for referral codes (SECRET - only known by organizers)
-const GROUP_CODES = {
-  'BAL2025ECON': 'Bal Economic',
-  'BAL2025CARA': 'Bal Carabella'
-};
-
-// Generate unique referral code
-function generateReferralCode() {
-  return Math.random().toString(36).substring(2, 8).toUpperCase();
-}
 
 const User = mongoose.model('User', userSchema);
 const Ticket = mongoose.model('Ticket', ticketSchema);
@@ -86,43 +73,27 @@ const authenticateToken = (req, res, next) => {
 
 // User registration
 app.post('/api/register', async (req, res) => {
-  const { username, password, referralCode } = req.body;
+  const { username, password } = req.body;
 
-  if (!username || !password || !referralCode) {
-    return res.status(400).json({ error: 'Username, password, and referral code are required' });
-  }
-
-  // Check if referral code is valid
-  if (!GROUP_CODES[referralCode]) {
-    return res.status(400).json({ error: 'Invalid referral code. Please contact an organizer for a valid code.' });
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password are required' });
   }
 
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
-    const group = GROUP_CODES[referralCode];
-    let userReferralCode = generateReferralCode();
-    
-    // Ensure referral code is unique
-    while (await User.findOne({ referralCode: userReferralCode })) {
-      userReferralCode = generateReferralCode();
-    }
 
     const user = await User.create({ 
       username, 
-      password: hashedPassword,
-      group,
-      referralCode: userReferralCode
+      password: hashedPassword
     });
     
-    const token = jwt.sign({ id: user._id, username: user.username, group: user.group }, JWT_SECRET, { expiresIn: '24h' });
+    const token = jwt.sign({ id: user._id, username: user.username }, JWT_SECRET, { expiresIn: '24h' });
     res.json({ 
       message: 'User created successfully', 
       token, 
       user: { 
         id: user._id, 
-        username: user.username, 
-        group: user.group,
-        referralCode: user.referralCode
+        username: user.username
       } 
     });
   } catch (error) {
@@ -150,8 +121,8 @@ app.post('/api/login', async (req, res) => {
     if (!validPassword) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
-    const token = jwt.sign({ id: user._id, username: user.username, group: user.group }, JWT_SECRET, { expiresIn: '24h' });
-    res.json({ message: 'Login successful', token, user: { id: user._id, username: user.username, group: user.group } });
+    const token = jwt.sign({ id: user._id, username: user.username }, JWT_SECRET, { expiresIn: '24h' });
+    res.json({ message: 'Login successful', token, user: { id: user._id, username: user.username } });
   } catch (error) {
     res.status(500).json({ error: 'Server error' });
   }
@@ -173,7 +144,6 @@ app.post('/api/tickets', authenticateToken, async (req, res) => {
   try {
     const qrData = JSON.stringify({
       userId: req.user.id,
-      group: req.user.group,
       nume,
       telefon,
       tip_bilet,
@@ -182,7 +152,6 @@ app.post('/api/tickets', authenticateToken, async (req, res) => {
     const qrCodeDataURL = await QRCode.toDataURL(qrData);
     const ticket = await Ticket.create({
       user_id: req.user.id,
-      group: req.user.group,
       nume,
       telefon,
       tip_bilet,
@@ -245,10 +214,10 @@ app.get('/api/tickets/:id/qr.png', async (req, res) => {
   }
 });
 
-// Get tickets for user's group only
+// Get tickets for all users
 app.get('/api/tickets', authenticateToken, async (req, res) => {
   try {
-    const tickets = await Ticket.find({ group: req.user.group }).populate('user_id', 'username').sort({ created_at: 1 });
+    const tickets = await Ticket.find({}).populate('user_id', 'username').sort({ created_at: 1 });
     res.json({ tickets });
   } catch (error) {
     res.status(500).json({ error: 'Database error' });
