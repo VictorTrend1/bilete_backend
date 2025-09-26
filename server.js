@@ -116,7 +116,7 @@ app.post('/api/register', async (req, res) => {
       referralCode: userReferralCode
     });
     
-    const token = jwt.sign({ id: user._id, username: user.username, email: user.email || null, group: user.group }, JWT_SECRET, { expiresIn: '24h' });
+    const token = jwt.sign({ id: user._id, username: user.username, group: user.group }, JWT_SECRET, { expiresIn: '24h' });
     res.json({ 
       message: 'User created successfully', 
       token, 
