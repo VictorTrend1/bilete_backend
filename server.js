@@ -31,7 +31,6 @@ mongoose.connect(process.env.MONGODB_URI || MONGODB_URI, {
 // Mongoose Schemas and Models
 const userSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true, trim: true },
-  email: { type: String, required: false, unique: false, lowercase: true, trim: true },
   password: { type: String, required: true },
   group: { type: String, required: true, trim: true },
   referralCode: { type: String, required: true, unique: true },
@@ -87,7 +86,7 @@ const authenticateToken = (req, res, next) => {
 
 // User registration
 app.post('/api/register', async (req, res) => {
-  const { username, email, password, referralCode } = req.body;
+  const { username, password, referralCode } = req.body;
 
   if (!username || !password || !referralCode) {
     return res.status(400).json({ error: 'Username, password, and referral code are required' });
@@ -110,7 +109,6 @@ app.post('/api/register', async (req, res) => {
 
     const user = await User.create({ 
       username, 
-      email: email || null, 
       password: hashedPassword,
       group,
       referralCode: userReferralCode
@@ -123,14 +121,13 @@ app.post('/api/register', async (req, res) => {
       user: { 
         id: user._id, 
         username: user.username, 
-        email: user.email,
         group: user.group,
         referralCode: user.referralCode
       } 
     });
   } catch (error) {
     if (error.code === 11000) {
-      return res.status(400).json({ error: 'Username or email already exists' });
+      return res.status(400).json({ error: 'Username already exists' });
     }
     res.status(500).json({ error: 'Server error' });
   }
@@ -145,7 +142,7 @@ app.post('/api/login', async (req, res) => {
   }
 
   try {
-    const user = await User.findOne({ $or: [{ username }, { email: username }] });
+    const user = await User.findOne({ username });
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -153,8 +150,8 @@ app.post('/api/login', async (req, res) => {
     if (!validPassword) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
-    const token = jwt.sign({ id: user._id, username: user.username, email: user.email }, JWT_SECRET, { expiresIn: '24h' });
-    res.json({ message: 'Login successful', token, user: { id: user._id, username: user.username, email: user.email } });
+    const token = jwt.sign({ id: user._id, username: user.username, group: user.group }, JWT_SECRET, { expiresIn: '24h' });
+    res.json({ message: 'Login successful', token, user: { id: user._id, username: user.username, group: user.group } });
   } catch (error) {
     res.status(500).json({ error: 'Server error' });
   }
