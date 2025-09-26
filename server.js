@@ -50,10 +50,10 @@ const ticketSchema = new mongoose.Schema({
   verified: { type: Boolean, default: false },
 }, { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 
-// Group mapping for referral codes
+// Group mapping for referral codes (SECRET - only known by organizers)
 const GROUP_CODES = {
-  '&Jcy4f': 'Bal Economic',
-  'v!pH8x': 'Bal Carabella'
+  'BAL2025ECON': 'Bal Economic',
+  'BAL2025CARA': 'Bal Carabella'
 };
 
 // Generate unique referral code
@@ -94,7 +94,7 @@ app.post('/api/register', async (req, res) => {
 
   // Check if referral code is valid
   if (!GROUP_CODES[referralCode]) {
-    return res.status(400).json({ error: 'Invalid referral code' });
+    return res.status(400).json({ error: 'Invalid referral code. Please contact an organizer for a valid code.' });
   }
 
   try {
