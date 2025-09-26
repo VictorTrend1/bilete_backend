@@ -288,7 +288,7 @@ app.post('/api/verify-ticket', async (req, res) => {
 // Get all tickets (for admin/organizer view)
 app.get('/api/admin/tickets', authenticateToken, async (req, res) => {
   try {
-    const tickets = await Ticket.find({}).sort({ created_at: 1 }).populate('user_id', 'username email');
+    const tickets = await Ticket.find({}).sort({ created_at: 1 }).populate('user_id', 'username');
     res.json({ tickets });
   } catch (error) {
     res.status(500).json({ error: 'Database error' });
