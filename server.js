@@ -379,6 +379,21 @@ app.post('/api/verify-ticket', async (req, res) => {
   }
 });
 
+// Delete ticket (only by creator or same group)
+app.delete('/api/tickets/:id', authenticateToken, async (req, res) => {
+  try {
+    const ticket = await Ticket.findOne({ _id: req.params.id, group: req.user.group });
+    if (!ticket) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+    
+    await Ticket.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Ticket deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 // Get all tickets (for admin/organizer view)
 app.get('/api/admin/tickets', authenticateToken, async (req, res) => {
   try {
