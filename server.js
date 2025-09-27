@@ -88,6 +88,15 @@ const authenticateToken = (req, res, next) => {
 
 // Routes
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
 // User registration
 app.post('/api/register', async (req, res) => {
   try {
