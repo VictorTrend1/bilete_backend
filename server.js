@@ -263,7 +263,7 @@ app.post('/api/tickets', authenticateToken, async (req, res) => {
 // Serve QR image for a ticket by id (auth required)
 app.get('/api/tickets/:id/qr', authenticateToken, async (req, res) => {
   try {
-    const ticket = await Ticket.findOne({ _id: req.params.id, user_id: req.user.id });
+    const ticket = await Ticket.findOne({ _id: req.params.id, group: req.user.group });
     if (!ticket) {
       return res.status(404).json({ error: 'Ticket not found' });
     }
