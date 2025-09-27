@@ -240,7 +240,17 @@ app.post('/api/tickets', authenticateToken, async (req, res) => {
       tip_bilet,
       timestamp: Date.now()
     });
-    const qrCodeDataURL = await QRCode.toDataURL(qrData);
+    const qrCodeDataURL = await QRCode.toDataURL(qrData, {
+      errorCorrectionLevel: 'H', // High error correction for better scanning
+      type: 'image/png',
+      quality: 0.92,
+      margin: 2,
+      color: {
+        dark: '#000000',
+        light: '#FFFFFF'
+      },
+      width: 300
+    });
     const ticket = await Ticket.create({
       user_id: req.user.id,
       group: req.user.group,
@@ -276,7 +286,17 @@ app.get('/api/tickets/:id/qr', authenticateToken, async (req, res) => {
     if (!ticket) {
       return res.status(404).json({ error: 'Ticket not found' });
     }
-    const qrCodeDataURL = await QRCode.toDataURL(ticket.qr_code);
+    const qrCodeDataURL = await QRCode.toDataURL(ticket.qr_code, {
+      errorCorrectionLevel: 'H',
+      type: 'image/png',
+      quality: 0.92,
+      margin: 2,
+      color: {
+        dark: '#000000',
+        light: '#FFFFFF'
+      },
+      width: 300
+    });
     res.json({
       ticket: {
         id: ticket._id,
@@ -298,7 +318,17 @@ app.get('/api/tickets/:id/qr.png', async (req, res) => {
     if (!ticket) {
       return res.status(404).send('Not found');
     }
-    const buffer = await QRCode.toBuffer(ticket.qr_code, { type: 'png' });
+    const buffer = await QRCode.toBuffer(ticket.qr_code, { 
+      type: 'png',
+      errorCorrectionLevel: 'H',
+      quality: 0.92,
+      margin: 2,
+      color: {
+        dark: '#000000',
+        light: '#FFFFFF'
+      },
+      width: 300
+    });
     res.set('Content-Type', 'image/png');
     res.send(buffer);
   } catch (e) {
