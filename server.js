@@ -117,10 +117,67 @@ const authenticateToken = (req, res, next) => {
 
 // Bot status endpoint
 app.get('/api/bot/status', (req, res) => {
+    const botStatus = whatsappBot.getStatus();
+    console.log('Bot status endpoint called:', { botInitialized, botStatus });
     res.json({
         initialized: botInitialized,
-        status: whatsappBot.getStatus()
+        ready: botStatus.isReady,
+        status: botStatus
     });
+});
+
+// Bot debug endpoint
+app.get('/api/bot/debug', (req, res) => {
+    const botStatus = whatsappBot.getStatus();
+    res.json({
+        botInitialized,
+        botStatus,
+        clientState: whatsappBot.client ? whatsappBot.client.getState() : 'No client',
+        isReady: botStatus.isReady,
+        timestamp: new Date().toISOString()
+    });
+});
+
+// Bot QR code endpoint
+app.get('/api/bot/qr', (req, res) => {
+    try {
+        if (!botInitialized) {
+            return res.status(503).json({ error: 'Bot not initialized' });
+        }
+        
+        const qrCode = whatsappBot.getQRCode();
+        
+        if (!qrCode) {
+            return res.status(404).json({ error: 'No QR code available. Bot may already be connected or not in pairing mode.' });
+        }
+        
+        // Generate QR code image from WhatsApp QR data
+        const QRCode = require('qrcode');
+        
+        QRCode.toDataURL(qrCode, {
+            errorCorrectionLevel: 'H',
+            type: 'image/png',
+            quality: 0.92,
+            margin: 2,
+            color: {
+                dark: '#000000',
+                light: '#FFFFFF'
+            },
+            width: 300
+        }, (err, qrCodeDataURL) => {
+            if (err) {
+                return res.status(500).json({ error: 'Failed to generate QR code image' });
+            }
+            
+            res.json({
+                qrCode: qrCodeDataURL,
+                message: 'Scan this QR code with WhatsApp to connect the bot'
+            });
+        });
+    } catch (error) {
+        console.error('Error generating QR code:', error);
+        res.status(500).json({ error: 'Failed to generate QR code' });
+    }
 });
 
 // Send ticket via bot
@@ -132,7 +189,10 @@ app.post('/api/bot/send-ticket', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'Ticket ID and phone number are required' });
         }
         
-        if (!botInitialized) {
+        // Check if bot is actually ready (not just initialized)
+        const botStatus = whatsappBot.getStatus();
+        console.log('Bot status check:', botStatus);
+        if (!botStatus.isReady) {
             return res.status(503).json({ error: 'WhatsApp Bot is not ready. Please scan QR code first.' });
         }
         
@@ -166,7 +226,10 @@ app.post('/api/bot/send-bulk-tickets', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'Ticket IDs and phone numbers arrays must match' });
         }
         
-        if (!botInitialized) {
+        // Check if bot is actually ready (not just initialized)
+        const botStatus = whatsappBot.getStatus();
+        console.log('Bot status check:', botStatus);
+        if (!botStatus.isReady) {
             return res.status(503).json({ error: 'WhatsApp Bot is not ready. Please scan QR code first.' });
         }
         
@@ -211,7 +274,10 @@ app.post('/api/bot/schedule-ticket', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'Ticket ID, phone number, and send time are required' });
         }
         
-        if (!botInitialized) {
+        // Check if bot is actually ready (not just initialized)
+        const botStatus = whatsappBot.getStatus();
+        console.log('Bot status check:', botStatus);
+        if (!botStatus.isReady) {
             return res.status(503).json({ error: 'WhatsApp Bot is not ready. Please scan QR code first.' });
         }
         
@@ -280,7 +346,10 @@ app.post('/api/bot/send-qr', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'Ticket ID and phone number are required' });
         }
         
-        if (!botInitialized) {
+        // Check if bot is actually ready (not just initialized)
+        const botStatus = whatsappBot.getStatus();
+        console.log('Bot status check:', botStatus);
+        if (!botStatus.isReady) {
             return res.status(503).json({ error: 'WhatsApp Bot is not ready. Please scan QR code first.' });
         }
         

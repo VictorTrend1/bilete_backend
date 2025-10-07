@@ -15,6 +15,7 @@ class WhatsAppBot {
         });
         this.isReady = false;
         this.scheduledMessages = new Map();
+        this.currentQRCode = null;
         this.setupEventHandlers();
     }
 
@@ -22,6 +23,7 @@ class WhatsAppBot {
         this.client.on('qr', (qr) => {
             console.log('QR Code received, scan it with your phone:');
             qrcode.generate(qr, { small: true });
+            this.currentQRCode = qr;
         });
 
         this.client.on('ready', () => {
@@ -242,6 +244,10 @@ _Te rugăm să păstrezi acest bilet pentru verificare._`;
                 number: this.client.info.wid.user
             } : null
         };
+    }
+
+    getQRCode() {
+        return this.currentQRCode;
     }
 
     async destroy() {
