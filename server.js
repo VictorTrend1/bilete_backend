@@ -373,8 +373,16 @@ app.get('/api/tickets/:id/custom-bal', authenticateToken, async (req, res) => {
     // Load QR code image
     const qrImage = await Jimp.read(qrBuffer);
     
-    // Load larger white bold font for name
-    const font = await Jimp.loadFont(Jimp.FONT_SANS_64_WHITE);
+    // Load Aquila Expanded font for name (bolder, more prominent)
+    let font;
+    try {
+      // Try to load Aquila Expanded font if available
+      font = await Jimp.loadFont(path.join(__dirname, 'fonts', 'aquila-expanded.fnt'));
+    } catch (error) {
+      console.log('Aquila Expanded font not found, using fallback font');
+      // Fallback to a bolder built-in font
+      font = await Jimp.loadFont(Jimp.FONT_SANS_64_WHITE);
+    }
     
     // Clone template to avoid modifying original
     const customTicket = template.clone();
