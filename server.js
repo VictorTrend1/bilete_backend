@@ -373,8 +373,8 @@ app.get('/api/tickets/:id/custom-bal', authenticateToken, async (req, res) => {
     // Load QR code image
     const qrImage = await Jimp.read(qrBuffer);
     
-    // Load font for name
-    const font = await Jimp.loadFont(Jimp.FONT_SANS_32_BLACK);
+    // Load larger white bold font for name
+    const font = await Jimp.loadFont(Jimp.FONT_SANS_64_WHITE);
     
     // Clone template to avoid modifying original
     const customTicket = template.clone();
@@ -394,9 +394,9 @@ app.get('/api/tickets/:id/custom-bal', authenticateToken, async (req, res) => {
     // Composite QR code onto template
     customTicket.composite(qrImage, qrX, qrY);
     
-    // Add name text centered in the text box
+    // Add name text centered in the text box (uppercase, white, bold)
     customTicket.print(font, nameX, nameY, {
-      text: ticket.nume,
+      text: ticket.nume.toUpperCase(),
       alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER,
       alignmentY: Jimp.VERTICAL_ALIGN_MIDDLE
     }, textBoxWidth, textBoxHeight);
