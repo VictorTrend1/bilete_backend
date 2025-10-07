@@ -377,7 +377,7 @@ app.get('/api/tickets/:id/custom-bal-public', async (req, res) => {
     let font;
     try {
       // Try to load Benzin-BOLD font if available
-      font = await Jimp.loadFont(path.join(__dirname, 'fonts', 'benzin-bold.fnt'));
+      font = await Jimp.loadFont(path.join(__dirname, 'fonts', 'benzin-bold.ttf'));
     } catch (error) {
       console.log('Benzin-BOLD font not found, using fallback font');
       // Fallback to a bolder built-in font
