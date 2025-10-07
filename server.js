@@ -6,12 +6,38 @@ const mongoose = require('mongoose');
 const QRCode = require('qrcode');
 const path = require('path');
 const Jimp = require('jimp');
+const fs = require('fs');
 require('dotenv').config();
 const { MONGODB_URI } = require('./config');
+const WhatsAppBot = require('./botService');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+
+// Initialize WhatsApp Bot
+const whatsappBot = new WhatsAppBot();
+let botInitialized = false;
+
+// Initialize bot on startup
+(async () => {
+    try {
+        // Create temp directory for bot files
+        const tempDir = path.join(__dirname, 'temp');
+        if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+        }
+        
+        botInitialized = await whatsappBot.initialize();
+        if (botInitialized) {
+            console.log('WhatsApp Bot initialized successfully');
+        } else {
+            console.log('WhatsApp Bot initialization failed - manual setup required');
+        }
+    } catch (error) {
+        console.error('Error initializing WhatsApp Bot:', error);
+    }
+})();
 
 // Middleware
 app.use(cors());
@@ -86,6 +112,210 @@ const authenticateToken = (req, res, next) => {
     next();
   });
 };
+
+// Bot Routes
+
+// Bot status endpoint
+app.get('/api/bot/status', (req, res) => {
+    res.json({
+        initialized: botInitialized,
+        status: whatsappBot.getStatus()
+    });
+});
+
+// Send ticket via bot
+app.post('/api/bot/send-ticket', authenticateToken, async (req, res) => {
+    try {
+        const { ticketId, phoneNumber, customImagePath } = req.body;
+        
+        if (!ticketId || !phoneNumber) {
+            return res.status(400).json({ error: 'Ticket ID and phone number are required' });
+        }
+        
+        if (!botInitialized) {
+            return res.status(503).json({ error: 'WhatsApp Bot is not ready. Please scan QR code first.' });
+        }
+        
+        // Get ticket details
+        const ticket = await Ticket.findOne({ _id: ticketId, group: req.user.group });
+        if (!ticket) {
+            return res.status(404).json({ error: 'Ticket not found' });
+        }
+        
+        // Send ticket via bot
+        const result = await whatsappBot.sendTicket(ticket, phoneNumber, customImagePath);
+        
+        res.json({
+            success: true,
+            message: 'Ticket sent successfully',
+            result
+        });
+        
+    } catch (error) {
+        console.error('Error sending ticket via bot:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Send bulk tickets via bot
+app.post('/api/bot/send-bulk-tickets', authenticateToken, async (req, res) => {
+    try {
+        const { ticketIds, phoneNumbers, customImagePaths } = req.body;
+        
+        if (!ticketIds || !phoneNumbers || ticketIds.length !== phoneNumbers.length) {
+            return res.status(400).json({ error: 'Ticket IDs and phone numbers arrays must match' });
+        }
+        
+        if (!botInitialized) {
+            return res.status(503).json({ error: 'WhatsApp Bot is not ready. Please scan QR code first.' });
+        }
+        
+        // Get tickets details
+        const tickets = await Ticket.find({ 
+            _id: { $in: ticketIds }, 
+            group: req.user.group 
+        });
+        
+        if (tickets.length !== ticketIds.length) {
+            return res.status(404).json({ error: 'Some tickets not found' });
+        }
+        
+        // Prepare data for bulk sending
+        const ticketsData = tickets.map((ticket, index) => ({
+            ...ticket.toObject(),
+            telefon: phoneNumbers[index],
+            customImagePath: customImagePaths ? customImagePaths[index] : null
+        }));
+        
+        // Send bulk tickets
+        const results = await whatsappBot.sendBulkTickets(ticketsData);
+        
+        res.json({
+            success: true,
+            message: 'Bulk tickets processing completed',
+            results
+        });
+        
+    } catch (error) {
+        console.error('Error sending bulk tickets via bot:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Schedule ticket sending
+app.post('/api/bot/schedule-ticket', authenticateToken, async (req, res) => {
+    try {
+        const { ticketId, phoneNumber, sendTime, customImagePath } = req.body;
+        
+        if (!ticketId || !phoneNumber || !sendTime) {
+            return res.status(400).json({ error: 'Ticket ID, phone number, and send time are required' });
+        }
+        
+        if (!botInitialized) {
+            return res.status(503).json({ error: 'WhatsApp Bot is not ready. Please scan QR code first.' });
+        }
+        
+        // Get ticket details
+        const ticket = await Ticket.findOne({ _id: ticketId, group: req.user.group });
+        if (!ticket) {
+            return res.status(404).json({ error: 'Ticket not found' });
+        }
+        
+        // Schedule ticket sending
+        const jobId = whatsappBot.scheduleTicketSending(ticket, phoneNumber, sendTime, customImagePath);
+        
+        res.json({
+            success: true,
+            message: 'Ticket scheduled successfully',
+            jobId,
+            sendTime
+        });
+        
+    } catch (error) {
+        console.error('Error scheduling ticket:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get scheduled messages
+app.get('/api/bot/scheduled-messages', authenticateToken, (req, res) => {
+    try {
+        const scheduledMessages = whatsappBot.getScheduledMessages();
+        res.json({
+            success: true,
+            scheduledMessages
+        });
+    } catch (error) {
+        console.error('Error getting scheduled messages:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Cancel scheduled message
+app.delete('/api/bot/scheduled-messages/:jobId', authenticateToken, (req, res) => {
+    try {
+        const { jobId } = req.params;
+        const cancelled = whatsappBot.cancelScheduledMessage(jobId);
+        
+        if (cancelled) {
+            res.json({
+                success: true,
+                message: 'Scheduled message cancelled successfully'
+            });
+        } else {
+            res.status(404).json({ error: 'Scheduled message not found' });
+        }
+    } catch (error) {
+        console.error('Error cancelling scheduled message:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Send QR code via bot
+app.post('/api/bot/send-qr', authenticateToken, async (req, res) => {
+    try {
+        const { ticketId, phoneNumber } = req.body;
+        
+        if (!ticketId || !phoneNumber) {
+            return res.status(400).json({ error: 'Ticket ID and phone number are required' });
+        }
+        
+        if (!botInitialized) {
+            return res.status(503).json({ error: 'WhatsApp Bot is not ready. Please scan QR code first.' });
+        }
+        
+        // Get ticket and generate QR code
+        const ticket = await Ticket.findOne({ _id: ticketId, group: req.user.group });
+        if (!ticket) {
+            return res.status(404).json({ error: 'Ticket not found' });
+        }
+        
+        const qrCodeDataURL = await QRCode.toDataURL(ticket.qr_code, {
+            errorCorrectionLevel: 'H',
+            type: 'image/png',
+            quality: 0.92,
+            margin: 2,
+            color: {
+                dark: '#000000',
+                light: '#FFFFFF'
+            },
+            width: 300
+        });
+        
+        // Send QR code via bot
+        const result = await whatsappBot.sendQRCode(phoneNumber, qrCodeDataURL);
+        
+        res.json({
+            success: true,
+            message: 'QR code sent successfully',
+            result
+        });
+        
+    } catch (error) {
+        console.error('Error sending QR code via bot:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
 
 // Routes
 
@@ -620,6 +850,15 @@ app.listen(PORT, () => {
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
+  console.log('Shutting down gracefully...');
+  
+  // Destroy WhatsApp bot
+  if (whatsappBot) {
+    await whatsappBot.destroy();
+    console.log('WhatsApp Bot destroyed.');
+  }
+  
+  // Close MongoDB connection
   await mongoose.connection.close();
   console.log('MongoDB connection closed.');
   process.exit(0);
