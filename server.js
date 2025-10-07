@@ -337,6 +337,91 @@ app.get('/api/tickets/:id/qr.png', async (req, res) => {
   }
 });
 
+// Public custom BAL ticket generation (no auth required for sharing)
+app.get('/api/tickets/:id/custom-bal-public', async (req, res) => {
+  try {
+    const ticket = await Ticket.findById(req.params.id);
+    if (!ticket) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+
+    // Only generate custom ticket for BAL type
+    if (ticket.tip_bilet !== 'BAL') {
+      return res.status(400).json({ error: 'Custom ticket generation only available for BAL tickets' });
+    }
+
+    // Load the template image
+    const templatePath = path.join(__dirname, 'model_bilet.jpg');
+    const template = await Jimp.read(templatePath);
+    
+    // Calculate QR code size (square from 1049,270 to 1424,638)
+    const qrSize = 1424 - 1049; // 375 pixels
+    
+    // Generate QR code as buffer with correct size
+    const qrBuffer = await QRCode.toBuffer(ticket.qr_code, {
+      type: 'png',
+      errorCorrectionLevel: 'H',
+      quality: 0.92,
+      margin: 2,
+      color: {
+        dark: '#000000',
+        light: '#FFFFFF'
+      },
+      width: qrSize // Use calculated size to fit the template box
+    });
+    
+    // Load QR code image
+    const qrImage = await Jimp.read(qrBuffer);
+    
+    // Load Benzin-BOLD font for name (bolder, more prominent)
+    let font;
+    try {
+      // Try to load Benzin-BOLD font if available
+      font = await Jimp.loadFont(path.join(__dirname, 'fonts', 'benzin-bold.fnt'));
+    } catch (error) {
+      console.log('Benzin-BOLD font not found, using fallback font');
+      // Fallback to a bolder built-in font
+      font = await Jimp.loadFont(Jimp.FONT_SANS_64_WHITE);
+    }
+    
+    // Clone template to avoid modifying original
+    const customTicket = template.clone();
+    
+    // Position for QR code (from template coordinates)
+    const qrX = 1049;  // X position for QR code
+    const qrY = 270;   // Y position for QR code
+    
+    // Position for name (from template coordinates - center in the text box)
+    const nameX = 84;   // X position for name (left edge of text box)
+    const nameY = 334;  // Y position for name (top edge of text box)
+    
+    // Calculate text box dimensions for proper centering
+    const textBoxWidth = 928 - 84;  // 844 pixels wide
+    const textBoxHeight = 566 - 334; // 232 pixels tall
+    
+    // Composite QR code onto template
+    customTicket.composite(qrImage, qrX, qrY);
+    
+    // Add name text centered in the text box (uppercase, white, bold)
+    customTicket.print(font, nameX, nameY, {
+      text: ticket.nume.toUpperCase(),
+      alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER,
+      alignmentY: Jimp.VERTICAL_ALIGN_MIDDLE
+    }, textBoxWidth, textBoxHeight);
+    
+    // Get buffer and send as PNG
+    const buffer = await customTicket.getBufferAsync(Jimp.MIME_PNG);
+    
+    res.set('Content-Type', 'image/png');
+    res.set('Content-Disposition', `attachment; filename="bilet-${ticket.nume}-${ticket._id}.png"`);
+    res.send(buffer);
+    
+  } catch (error) {
+    console.error('Custom BAL ticket generation error:', error);
+    res.status(500).json({ error: 'Failed to generate custom ticket' });
+  }
+});
+
 // Custom BAL ticket generation with template
 app.get('/api/tickets/:id/custom-bal', authenticateToken, async (req, res) => {
   try {
@@ -373,13 +458,13 @@ app.get('/api/tickets/:id/custom-bal', authenticateToken, async (req, res) => {
     // Load QR code image
     const qrImage = await Jimp.read(qrBuffer);
     
-    // Load Aquila Expanded font for name (bolder, more prominent)
+    // Load Benzin-BOLD font for name (bolder, more prominent)
     let font;
     try {
-      // Try to load Aquila Expanded font if available
-      font = await Jimp.loadFont(path.join(__dirname, 'fonts', 'aquila-expanded.fnt'));
+      // Try to load Benzin-BOLD font if available
+      font = await Jimp.loadFont(path.join(__dirname, 'fonts', 'benzin-bold.fnt'));
     } catch (error) {
-      console.log('Aquila Expanded font not found, using fallback font');
+      console.log('Benzin-BOLD font not found, using fallback font');
       // Fallback to a bolder built-in font
       font = await Jimp.loadFont(Jimp.FONT_SANS_64_WHITE);
     }
