@@ -9,15 +9,15 @@ const Jimp = require('jimp');
 const fs = require('fs');
 require('dotenv').config();
 const { MONGODB_URI } = require('./config');
-const WhatsAppBot = require('./botService');
+const AlternativeMessagingService = require('./alternativeMessagingService');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
-// Initialize WhatsApp Bot
-const whatsappBot = new WhatsAppBot();
-let botInitialized = false;
+// Initialize Alternative Messaging Service
+const messagingService = new AlternativeMessagingService();
+let serviceInitialized = false;
 
 // Initialize bot on startup
 (async () => {
@@ -28,14 +28,14 @@ let botInitialized = false;
             fs.mkdirSync(tempDir, { recursive: true });
         }
         
-        botInitialized = await whatsappBot.initialize();
-        if (botInitialized) {
-            console.log('WhatsApp Bot initialized successfully');
+        serviceInitialized = await messagingService.initialize();
+        if (serviceInitialized) {
+            console.log('Alternative Messaging Service initialized successfully');
         } else {
-            console.log('WhatsApp Bot initialization failed - manual setup required');
+            console.log('Alternative Messaging Service initialization failed - check configuration');
         }
     } catch (error) {
-        console.error('Error initializing WhatsApp Bot:', error);
+        console.error('Error initializing Alternative Messaging Service:', error);
     }
 })();
 
@@ -115,85 +115,63 @@ const authenticateToken = (req, res, next) => {
 
 // Bot Routes
 
-// Bot status endpoint
+// Messaging service status endpoint
 app.get('/api/bot/status', (req, res) => {
-    const botStatus = whatsappBot.getStatus();
-    console.log('Bot status endpoint called:', { botInitialized, botStatus });
+    const serviceStatus = messagingService.getStatus();
+    console.log('Messaging service status endpoint called:', { serviceInitialized, serviceStatus });
     res.json({
-        initialized: botInitialized,
-        ready: botStatus.isReady,
-        status: botStatus
+        initialized: serviceInitialized,
+        ready: serviceStatus.isReady,
+        status: serviceStatus
     });
 });
 
-// Bot debug endpoint
+// Messaging service debug endpoint
 app.get('/api/bot/debug', (req, res) => {
-    const botStatus = whatsappBot.getStatus();
+    const serviceStatus = messagingService.getStatus();
     res.json({
-        botInitialized,
-        botStatus,
-        clientState: whatsappBot.client ? whatsappBot.client.getState() : 'No client',
-        isReady: botStatus.isReady,
+        serviceInitialized,
+        serviceStatus,
+        services: serviceStatus.services,
+        isReady: serviceStatus.isReady,
         timestamp: new Date().toISOString()
     });
 });
 
-// Bot QR code endpoint
-app.get('/api/bot/qr', (req, res) => {
+// Messaging service configuration endpoint
+app.get('/api/bot/config', (req, res) => {
     try {
-        if (!botInitialized) {
-            return res.status(503).json({ error: 'Bot not initialized' });
+        if (!serviceInitialized) {
+            return res.status(503).json({ error: 'Messaging service not initialized' });
         }
         
-        const qrCode = whatsappBot.getQRCode();
-        
-        if (!qrCode) {
-            return res.status(404).json({ error: 'No QR code available. Bot may already be connected or not in pairing mode.' });
-        }
-        
-        // Generate QR code image from WhatsApp QR data
-        const QRCode = require('qrcode');
-        
-        QRCode.toDataURL(qrCode, {
-            errorCorrectionLevel: 'H',
-            type: 'image/png',
-            quality: 0.92,
-            margin: 2,
-            color: {
-                dark: '#000000',
-                light: '#FFFFFF'
-            },
-            width: 300
-        }, (err, qrCodeDataURL) => {
-            if (err) {
-                return res.status(500).json({ error: 'Failed to generate QR code image' });
-            }
-            
-            res.json({
-                qrCode: qrCodeDataURL,
-                message: 'Scan this QR code with WhatsApp to connect the bot'
-            });
+        const serviceStatus = messagingService.getStatus();
+        res.json({
+            message: 'Alternative Messaging Service is configured and ready',
+            status: 'ready',
+            services: serviceStatus.services,
+            config: serviceStatus.config
         });
     } catch (error) {
-        console.error('Error generating QR code:', error);
-        res.status(500).json({ error: 'Failed to generate QR code' });
+        console.error('Error getting messaging service config:', error);
+        res.status(500).json({ error: 'Failed to get messaging service configuration' });
     }
 });
 
-// Send ticket via bot
+// Send ticket via messaging service
 app.post('/api/bot/send-ticket', authenticateToken, async (req, res) => {
     try {
-        const { ticketId, phoneNumber, customImagePath } = req.body;
+        const { ticketId, phoneNumber, email, customImagePath } = req.body;
         
         if (!ticketId || !phoneNumber) {
             return res.status(400).json({ error: 'Ticket ID and phone number are required' });
         }
         
-        // Check if bot is actually ready (not just initialized)
-        const botStatus = whatsappBot.getStatus();
-        console.log('Bot status check:', botStatus);
-        if (!botStatus.isReady) {
-            return res.status(503).json({ error: 'WhatsApp Bot is not ready. Please scan QR code first.' });
+        // Check if messaging service is ready
+        const serviceStatus = messagingService.getStatus();
+        console.log('Messaging service status check:', serviceStatus);
+        if (!serviceStatus.isReady) {
+            return res.status(503).json({ error: 'Messaging service is not ready. Please check configuration.' });
         }
         
         // Get ticket details
@@ -202,35 +180,35 @@ app.post('/api/bot/send-ticket', authenticateToken, async (req, res) => {
             return res.status(404).json({ error: 'Ticket not found' });
         }
         
-        // Send ticket via bot
-        const result = await whatsappBot.sendTicket(ticket, phoneNumber, customImagePath);
+        // Send ticket via messaging service
+        const result = await messagingService.sendTicket(ticket, phoneNumber, email, customImagePath);
         
         res.json({
             success: true,
-            message: 'Ticket sent successfully',
+            message: 'Ticket sending attempted with multiple methods',
             result
         });
         
     } catch (error) {
-        console.error('Error sending ticket via bot:', error);
+        console.error('Error sending ticket via messaging service:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
-// Send bulk tickets via bot
+// Send bulk tickets via messaging service
 app.post('/api/bot/send-bulk-tickets', authenticateToken, async (req, res) => {
     try {
-        const { ticketIds, phoneNumbers, customImagePaths } = req.body;
+        const { ticketIds, phoneNumbers, emails, customImagePaths } = req.body;
         
         if (!ticketIds || !phoneNumbers || ticketIds.length !== phoneNumbers.length) {
             return res.status(400).json({ error: 'Ticket IDs and phone numbers arrays must match' });
         }
         
-        // Check if bot is actually ready (not just initialized)
-        const botStatus = whatsappBot.getStatus();
-        console.log('Bot status check:', botStatus);
-        if (!botStatus.isReady) {
-            return res.status(503).json({ error: 'WhatsApp Bot is not ready. Please scan QR code first.' });
+        // Check if messaging service is ready
+        const serviceStatus = messagingService.getStatus();
+        console.log('Messaging service status check:', serviceStatus);
+        if (!serviceStatus.isReady) {
+            return res.status(503).json({ error: 'Messaging service is not ready. Please check configuration.' });
         }
         
         // Get tickets details
@@ -247,11 +225,12 @@ app.post('/api/bot/send-bulk-tickets', authenticateToken, async (req, res) => {
         const ticketsData = tickets.map((ticket, index) => ({
             ...ticket.toObject(),
             telefon: phoneNumbers[index],
+            email: emails ? emails[index] : null,
             customImagePath: customImagePaths ? customImagePaths[index] : null
         }));
         
         // Send bulk tickets
-        const results = await whatsappBot.sendBulkTickets(ticketsData);
+        const results = await messagingService.sendBulkTickets(ticketsData);
         
         res.json({
             success: true,
@@ -260,7 +239,7 @@ app.post('/api/bot/send-bulk-tickets', authenticateToken, async (req, res) => {
         });
         
     } catch (error) {
-        console.error('Error sending bulk tickets via bot:', error);
+        console.error('Error sending bulk tickets via messaging service:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -268,17 +247,17 @@ app.post('/api/bot/send-bulk-tickets', authenticateToken, async (req, res) => {
 // Schedule ticket sending
 app.post('/api/bot/schedule-ticket', authenticateToken, async (req, res) => {
     try {
-        const { ticketId, phoneNumber, sendTime, customImagePath } = req.body;
+        const { ticketId, phoneNumber, email, sendTime, customImagePath } = req.body;
         
         if (!ticketId || !phoneNumber || !sendTime) {
             return res.status(400).json({ error: 'Ticket ID, phone number, and send time are required' });
         }
         
-        // Check if bot is actually ready (not just initialized)
-        const botStatus = whatsappBot.getStatus();
-        console.log('Bot status check:', botStatus);
-        if (!botStatus.isReady) {
-            return res.status(503).json({ error: 'WhatsApp Bot is not ready. Please scan QR code first.' });
+        // Check if messaging service is ready
+        const serviceStatus = messagingService.getStatus();
+        console.log('Messaging service status check:', serviceStatus);
+        if (!serviceStatus.isReady) {
+            return res.status(503).json({ error: 'Messaging service is not ready. Please check configuration.' });
         }
         
         // Get ticket details
@@ -288,7 +267,7 @@ app.post('/api/bot/schedule-ticket', authenticateToken, async (req, res) => {
         }
         
         // Schedule ticket sending
-        const jobId = whatsappBot.scheduleTicketSending(ticket, phoneNumber, sendTime, customImagePath);
+        const jobId = messagingService.scheduleTicketSending(ticket, phoneNumber, sendTime, email, customImagePath);
         
         res.json({
             success: true,
@@ -306,7 +285,7 @@ app.post('/api/bot/schedule-ticket', authenticateToken, async (req, res) => {
 // Get scheduled messages
 app.get('/api/bot/scheduled-messages', authenticateToken, (req, res) => {
     try {
-        const scheduledMessages = whatsappBot.getScheduledMessages();
+        const scheduledMessages = messagingService.getScheduledMessages();
         res.json({
             success: true,
             scheduledMessages
@@ -321,7 +300,7 @@ app.get('/api/bot/scheduled-messages', authenticateToken, (req, res) => {
 app.delete('/api/bot/scheduled-messages/:jobId', authenticateToken, (req, res) => {
     try {
         const { jobId } = req.params;
-        const cancelled = whatsappBot.cancelScheduledMessage(jobId);
+        const cancelled = messagingService.cancelScheduledMessage(jobId);
         
         if (cancelled) {
             res.json({
@@ -347,10 +326,10 @@ app.post('/api/bot/send-qr', authenticateToken, async (req, res) => {
         }
         
         // Check if bot is actually ready (not just initialized)
-        const botStatus = whatsappBot.getStatus();
+        const botStatus = metaBot.getStatus();
         console.log('Bot status check:', botStatus);
         if (!botStatus.isReady) {
-            return res.status(503).json({ error: 'WhatsApp Bot is not ready. Please scan QR code first.' });
+            return res.status(503).json({ error: 'Meta Bot Service is not ready. Please check API credentials.' });
         }
         
         // Get ticket and generate QR code
@@ -371,8 +350,8 @@ app.post('/api/bot/send-qr', authenticateToken, async (req, res) => {
             width: 300
         });
         
-        // Send QR code via bot
-        const result = await whatsappBot.sendQRCode(phoneNumber, qrCodeDataURL);
+        // Send QR code via messaging service
+        const result = await messagingService.sendQRCode(phoneNumber, qrCodeDataURL);
         
         res.json({
             success: true,
@@ -921,10 +900,10 @@ app.listen(PORT, () => {
 process.on('SIGINT', async () => {
   console.log('Shutting down gracefully...');
   
-  // Destroy WhatsApp bot
-  if (whatsappBot) {
-    await whatsappBot.destroy();
-    console.log('WhatsApp Bot destroyed.');
+  // Destroy messaging service
+  if (messagingService) {
+    await messagingService.destroy();
+    console.log('Alternative Messaging Service destroyed.');
   }
   
   // Close MongoDB connection
