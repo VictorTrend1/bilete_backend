@@ -158,6 +158,45 @@ app.get('/api/bot/config', async (req, res) => {
     }
 });
 
+// Start WhatsApp automation (opens browser for QR code scanning)
+app.post('/api/bot/start-automation', async (req, res) => {
+    try {
+        if (!serviceInitialized) {
+            return res.status(503).json({ error: 'Messaging service not initialized' });
+        }
+        
+        console.log('Starting WhatsApp automation via API...');
+        const result = await messagingService.startAutomation();
+        
+        if (result.success) {
+            res.json({
+                success: true,
+                message: result.message,
+                instructions: {
+                    step1: 'A browser window has opened on the server with WhatsApp Web',
+                    step2: 'Open WhatsApp on your phone',
+                    step3: 'Go to Settings > Linked Devices > Link a Device',
+                    step4: 'Scan the QR code shown in the browser',
+                    step5: 'Wait for "Successfully logged in" message',
+                    note: 'If you cannot access the server display, automation will not work. Use manual links instead.'
+                }
+            });
+        } else {
+            res.status(500).json({
+                success: false,
+                error: result.message,
+                fallback: 'System will continue using manual WhatsApp links'
+            });
+        }
+    } catch (error) {
+        console.error('Error starting automation:', error);
+        res.status(500).json({ 
+            error: error.message,
+            fallback: 'System will continue using manual WhatsApp links'
+        });
+    }
+});
+
 // Send ticket via messaging service
 app.post('/api/bot/send-ticket', authenticateToken, async (req, res) => {
     try {

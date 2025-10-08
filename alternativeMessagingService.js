@@ -22,22 +22,34 @@ class AlternativeMessagingService {
 
     async initialize() {
         try {
-            // Initialize WhatsApp automation
-            const automationReady = await this.whatsappAutomation.initialize();
-            
-            if (automationReady) {
-                this.isReady = true;
-                console.log('WhatsApp Messaging Service with automation initialized successfully');
-            } else {
-                console.log('WhatsApp Messaging Service initialized (automation not ready - manual setup required)');
-                this.isReady = true; // Still ready for link generation
-            }
-            
+            // Don't auto-start browser automation on initialization
+            // It will be started manually when needed
+            this.isReady = true;
+            console.log('WhatsApp Messaging Service initialized (manual link mode)');
+            console.log('To enable automation, call startAutomation() endpoint');
             return true;
         } catch (error) {
             console.error('Failed to initialize WhatsApp Messaging Service:', error);
             this.isReady = false;
             return false;
+        }
+    }
+
+    async startAutomation() {
+        try {
+            console.log('Starting WhatsApp automation...');
+            const automationReady = await this.whatsappAutomation.initialize();
+            
+            if (automationReady) {
+                console.log('✅ WhatsApp automation started! Please scan QR code in the browser window.');
+                return { success: true, message: 'Automation started. Please scan QR code.' };
+            } else {
+                console.log('❌ Failed to start automation');
+                return { success: false, message: 'Failed to start automation. Check server logs.' };
+            }
+        } catch (error) {
+            console.error('Error starting automation:', error);
+            return { success: false, message: error.message };
         }
     }
 
