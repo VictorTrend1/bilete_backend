@@ -116,8 +116,8 @@ const authenticateToken = (req, res, next) => {
 // Bot Routes
 
 // Messaging service status endpoint
-app.get('/api/bot/status', (req, res) => {
-    const serviceStatus = messagingService.getStatus();
+app.get('/api/bot/status', async (req, res) => {
+    const serviceStatus = await messagingService.getStatus();
     console.log('Messaging service status endpoint called:', { serviceInitialized, serviceStatus });
     res.json({
         initialized: serviceInitialized,
@@ -127,8 +127,8 @@ app.get('/api/bot/status', (req, res) => {
 });
 
 // Messaging service debug endpoint
-app.get('/api/bot/debug', (req, res) => {
-    const serviceStatus = messagingService.getStatus();
+app.get('/api/bot/debug', async (req, res) => {
+    const serviceStatus = await messagingService.getStatus();
     res.json({
         serviceInitialized,
         serviceStatus,
@@ -139,13 +139,13 @@ app.get('/api/bot/debug', (req, res) => {
 });
 
 // Messaging service configuration endpoint
-app.get('/api/bot/config', (req, res) => {
+app.get('/api/bot/config', async (req, res) => {
     try {
         if (!serviceInitialized) {
             return res.status(503).json({ error: 'Messaging service not initialized' });
         }
         
-        const serviceStatus = messagingService.getStatus();
+        const serviceStatus = await messagingService.getStatus();
         res.json({
             message: 'Alternative Messaging Service is configured and ready',
             status: 'ready',
@@ -168,7 +168,7 @@ app.post('/api/bot/send-ticket', authenticateToken, async (req, res) => {
         }
         
         // Check if messaging service is ready
-        const serviceStatus = messagingService.getStatus();
+        const serviceStatus = await messagingService.getStatus();
         console.log('Messaging service status check:', serviceStatus);
         if (!serviceStatus.isReady) {
             return res.status(503).json({ error: 'Messaging service is not ready. Please check configuration.' });
@@ -205,7 +205,7 @@ app.post('/api/bot/send-bulk-tickets', authenticateToken, async (req, res) => {
         }
         
         // Check if messaging service is ready
-        const serviceStatus = messagingService.getStatus();
+        const serviceStatus = await messagingService.getStatus();
         console.log('Messaging service status check:', serviceStatus);
         if (!serviceStatus.isReady) {
             return res.status(503).json({ error: 'Messaging service is not ready. Please check configuration.' });
@@ -254,7 +254,7 @@ app.post('/api/bot/schedule-ticket', authenticateToken, async (req, res) => {
         }
         
         // Check if messaging service is ready
-        const serviceStatus = messagingService.getStatus();
+        const serviceStatus = await messagingService.getStatus();
         console.log('Messaging service status check:', serviceStatus);
         if (!serviceStatus.isReady) {
             return res.status(503).json({ error: 'Messaging service is not ready. Please check configuration.' });
@@ -326,7 +326,7 @@ app.post('/api/bot/send-qr', authenticateToken, async (req, res) => {
         }
         
         // Check if messaging service is ready
-        const serviceStatus = messagingService.getStatus();
+        const serviceStatus = await messagingService.getStatus();
         console.log('Messaging service status check:', serviceStatus);
         if (!serviceStatus.isReady) {
             return res.status(503).json({ error: 'Messaging service is not ready. Please check configuration.' });
