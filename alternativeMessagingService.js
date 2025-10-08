@@ -1,36 +1,16 @@
-const axios = require('axios');
-const nodemailer = require('nodemailer');
 const cron = require('node-cron');
-const fs = require('fs');
-const path = require('path');
 
 class AlternativeMessagingService {
     constructor() {
         this.scheduledMessages = new Map();
         this.isReady = false;
         
-        // Configuration for different messaging services
+        // Configuration for WhatsApp-only messaging
         this.config = {
-            // Twilio SMS configuration
-            twilio: {
-                accountSid: process.env.TWILIO_ACCOUNT_SID,
-                authToken: process.env.TWILIO_AUTH_TOKEN,
-                fromNumber: process.env.TWILIO_FROM_NUMBER,
-                enabled: !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN)
-            },
-            
-            // Email configuration
-            email: {
-                service: process.env.EMAIL_SERVICE || 'gmail',
-                user: process.env.EMAIL_USER,
-                pass: process.env.EMAIL_PASS,
-                enabled: !!(process.env.EMAIL_USER && process.env.EMAIL_PASS)
-            },
-            
             // WhatsApp Web automation (using WhatsApp Web directly)
             whatsappWeb: {
-                enabled: true, // Always available as fallback
-                requiresManualSetup: true
+                enabled: true, // Always available
+                requiresManualSetup: false
             }
         };
         
@@ -39,23 +19,12 @@ class AlternativeMessagingService {
 
     async initialize() {
         try {
-            // Initialize email transporter if configured
-            if (this.config.email.enabled) {
-                this.emailTransporter = nodemailer.createTransporter({
-                    service: this.config.email.service,
-                    auth: {
-                        user: this.config.email.user,
-                        pass: this.config.email.pass
-                    }
-                });
-                console.log('Email service initialized');
-            }
-            
+            // WhatsApp Web is always available - no additional setup needed
             this.isReady = true;
-            console.log('Alternative Messaging Service initialized successfully');
+            console.log('WhatsApp Messaging Service initialized successfully');
             return true;
         } catch (error) {
-            console.error('Failed to initialize Alternative Messaging Service:', error);
+            console.error('Failed to initialize WhatsApp Messaging Service:', error);
             this.isReady = false;
             return false;
         }
@@ -91,66 +60,7 @@ class AlternativeMessagingService {
 Te rugăm să păstrezi acest bilet pentru verificare.`;
     }
 
-    // Method 1: Send via Twilio SMS
-    async sendViaSMS(phoneNumber, message) {
-        if (!this.config.twilio.enabled) {
-            throw new Error('Twilio SMS not configured');
-        }
-
-        try {
-            const response = await axios.post(
-                `https://api.twilio.com/2010-04-01/Accounts/${this.config.twilio.accountSid}/Messages.json`,
-                new URLSearchParams({
-                    To: `+${this.formatPhoneNumber(phoneNumber)}`,
-                    From: this.config.twilio.fromNumber,
-                    Body: message
-                }),
-                {
-                    auth: {
-                        username: this.config.twilio.accountSid,
-                        password: this.config.twilio.authToken
-                    }
-                }
-            );
-
-            console.log(`SMS sent successfully to ${phoneNumber}:`, response.data);
-            return { success: true, method: 'SMS', data: response.data };
-        } catch (error) {
-            console.error('Error sending SMS:', error.response?.data || error.message);
-            throw new Error(`Failed to send SMS: ${error.response?.data?.message || error.message}`);
-        }
-    }
-
-    // Method 2: Send via Email
-    async sendViaEmail(email, subject, message, attachmentPath = null) {
-        if (!this.config.email.enabled) {
-            throw new Error('Email service not configured');
-        }
-
-        try {
-            const mailOptions = {
-                from: this.config.email.user,
-                to: email,
-                subject: subject,
-                text: message,
-                html: message.replace(/\n/g, '<br>')
-            };
-
-            if (attachmentPath && fs.existsSync(attachmentPath)) {
-                mailOptions.attachments = [{
-                    filename: path.basename(attachmentPath),
-                    path: attachmentPath
-                }];
-            }
-
-            const result = await this.emailTransporter.sendMail(mailOptions);
-            console.log(`Email sent successfully to ${email}:`, result.messageId);
-            return { success: true, method: 'Email', data: result };
-        } catch (error) {
-            console.error('Error sending email:', error);
-            throw new Error(`Failed to send email: ${error.message}`);
-        }
-    }
+    // WhatsApp Web link generation (primary method)
 
     // Method 3: Generate WhatsApp Web link
     generateWhatsAppLink(phoneNumber, message) {
@@ -159,50 +69,25 @@ Te rugăm să păstrezi acest bilet pentru verificare.`;
         return `https://wa.me/${formattedNumber}?text=${encodedMessage}`;
     }
 
-    // Main method to send ticket with fallback options
+    // Main method to send ticket via WhatsApp
     async sendTicket(ticketData, phoneNumber, email = null, customImagePath = null) {
         const message = this.createTicketMessage(ticketData);
-        const results = [];
-
-        // Try SMS first (if configured)
-        if (this.config.twilio.enabled) {
-            try {
-                const smsResult = await this.sendViaSMS(phoneNumber, message);
-                results.push(smsResult);
-            } catch (error) {
-                console.log('SMS failed, trying other methods:', error.message);
-            }
-        }
-
-        // Try Email (if email provided and configured)
-        if (email && this.config.email.enabled) {
-            try {
-                const emailResult = await this.sendViaEmail(
-                    email,
-                    `Bilet pentru eveniment - ${ticketData.nume}`,
-                    message,
-                    customImagePath
-                );
-                results.push(emailResult);
-            } catch (error) {
-                console.log('Email failed:', error.message);
-            }
-        }
-
-        // Always provide WhatsApp Web link as fallback
+        
+        // Generate WhatsApp Web link
         const whatsappLink = this.generateWhatsAppLink(phoneNumber, message);
-        results.push({
-            success: true,
-            method: 'WhatsApp_Web_Link',
-            link: whatsappLink,
-            message: 'Click the link to open WhatsApp Web and send the message'
-        });
-
+        
         return {
             success: true,
-            message: 'Ticket sending attempted with multiple methods',
-            results: results,
-            primaryMethod: results.find(r => r.success && r.method !== 'WhatsApp_Web_Link')?.method || 'WhatsApp_Web_Link'
+            message: 'Ticket ready for WhatsApp sending',
+            results: [{
+                success: true,
+                method: 'WhatsApp_Web_Link',
+                link: whatsappLink,
+                message: 'Click the link to open WhatsApp Web and send the message',
+                ticketData: ticketData,
+                phoneNumber: phoneNumber
+            }],
+            primaryMethod: 'WhatsApp_Web_Link'
         };
     }
 
@@ -297,13 +182,10 @@ Te rugăm să păstrezi acest bilet pentru verificare.`;
             isReady: this.isReady,
             scheduledMessages: this.scheduledMessages.size,
             services: {
-                sms: this.config.twilio.enabled,
-                email: this.config.email.enabled,
                 whatsappWeb: this.config.whatsappWeb.enabled
             },
             config: {
-                twilioConfigured: this.config.twilio.enabled,
-                emailConfigured: this.config.email.enabled
+                whatsappConfigured: this.config.whatsappWeb.enabled
             }
         };
     }

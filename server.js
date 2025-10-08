@@ -325,11 +325,11 @@ app.post('/api/bot/send-qr', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'Ticket ID and phone number are required' });
         }
         
-        // Check if bot is actually ready (not just initialized)
-        const botStatus = metaBot.getStatus();
-        console.log('Bot status check:', botStatus);
-        if (!botStatus.isReady) {
-            return res.status(503).json({ error: 'Meta Bot Service is not ready. Please check API credentials.' });
+        // Check if messaging service is ready
+        const serviceStatus = messagingService.getStatus();
+        console.log('Messaging service status check:', serviceStatus);
+        if (!serviceStatus.isReady) {
+            return res.status(503).json({ error: 'Messaging service is not ready. Please check configuration.' });
         }
         
         // Get ticket and generate QR code
