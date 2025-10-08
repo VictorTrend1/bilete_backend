@@ -1,16 +1,19 @@
 const cron = require('node-cron');
+const WhatsAppAutomation = require('./whatsappAutomation');
 
 class AlternativeMessagingService {
     constructor() {
         this.scheduledMessages = new Map();
         this.isReady = false;
+        this.whatsappAutomation = new WhatsAppAutomation();
         
         // Configuration for WhatsApp-only messaging
         this.config = {
             // WhatsApp Web automation (using WhatsApp Web directly)
             whatsappWeb: {
                 enabled: true, // Always available
-                requiresManualSetup: false
+                requiresManualSetup: false,
+                automationEnabled: true
             }
         };
         
@@ -19,9 +22,17 @@ class AlternativeMessagingService {
 
     async initialize() {
         try {
-            // WhatsApp Web is always available - no additional setup needed
-            this.isReady = true;
-            console.log('WhatsApp Messaging Service initialized successfully');
+            // Initialize WhatsApp automation
+            const automationReady = await this.whatsappAutomation.initialize();
+            
+            if (automationReady) {
+                this.isReady = true;
+                console.log('WhatsApp Messaging Service with automation initialized successfully');
+            } else {
+                console.log('WhatsApp Messaging Service initialized (automation not ready - manual setup required)');
+                this.isReady = true; // Still ready for link generation
+            }
+            
             return true;
         } catch (error) {
             console.error('Failed to initialize WhatsApp Messaging Service:', error);
@@ -72,35 +83,89 @@ Te rugăm să păstrezi acest bilet pentru verificare.`;
     // Main method to send ticket via WhatsApp
     async sendTicket(ticketData, phoneNumber, email = null, customImagePath = null) {
         const message = this.createTicketMessage(ticketData);
+        const results = [];
         
-        // Generate WhatsApp Web link
-        const whatsappLink = this.generateWhatsAppLink(phoneNumber, message);
-        
-        return {
-            success: true,
-            message: 'Ticket ready for WhatsApp sending',
-            results: [{
+        try {
+            // Try automated sending first
+            if (this.whatsappAutomation && this.whatsappAutomation.isReady) {
+                try {
+                    const automationResult = await this.whatsappAutomation.sendMessage(
+                        phoneNumber, 
+                        message, 
+                        customImagePath
+                    );
+                    
+                    results.push({
+                        success: true,
+                        method: 'WhatsApp_Automation',
+                        message: 'Message sent automatically via WhatsApp',
+                        result: automationResult
+                    });
+                    
+                    return {
+                        success: true,
+                        message: 'Ticket sent automatically via WhatsApp',
+                        results: results,
+                        primaryMethod: 'WhatsApp_Automation'
+                    };
+                    
+                } catch (automationError) {
+                    console.log('Automation failed, falling back to link generation:', automationError.message);
+                }
+            }
+            
+            // Fallback to link generation
+            const whatsappLink = this.generateWhatsAppLink(phoneNumber, message);
+            results.push({
                 success: true,
                 method: 'WhatsApp_Web_Link',
                 link: whatsappLink,
                 message: 'Click the link to open WhatsApp Web and send the message',
                 ticketData: ticketData,
                 phoneNumber: phoneNumber
-            }],
-            primaryMethod: 'WhatsApp_Web_Link'
-        };
+            });
+            
+            return {
+                success: true,
+                message: 'Ticket ready for WhatsApp sending (automation not available)',
+                results: results,
+                primaryMethod: 'WhatsApp_Web_Link'
+            };
+            
+        } catch (error) {
+            console.error('Error sending ticket:', error);
+            throw error;
+        }
     }
 
     async sendBulkTickets(ticketsData) {
         const results = [];
         
+        // If automation is available, use bulk sending
+        if (this.whatsappAutomation && this.whatsappAutomation.isReady) {
+            try {
+                const messages = ticketsData.map(ticket => ({
+                    phoneNumber: ticket.telefon,
+                    message: this.createTicketMessage(ticket),
+                    imagePath: ticket.customImagePath
+                }));
+                
+                const automationResults = await this.whatsappAutomation.sendBulkMessages(messages);
+                return automationResults;
+                
+            } catch (error) {
+                console.log('Bulk automation failed, falling back to individual sending:', error.message);
+            }
+        }
+        
+        // Fallback to individual sending
         for (const ticket of ticketsData) {
             try {
                 const result = await this.sendTicket(ticket, ticket.telefon, ticket.email, ticket.customImagePath);
                 results.push({ ...ticket, status: 'sent', result });
                 
                 // Add delay between messages to avoid rate limiting
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                await new Promise(resolve => setTimeout(resolve, 3000));
                 
             } catch (error) {
                 results.push({ 
@@ -178,15 +243,21 @@ Te rugăm să păstrezi acest bilet pentru verificare.`;
     }
 
     async getStatus() {
+        const automationStatus = this.whatsappAutomation ? await this.whatsappAutomation.getStatus() : null;
+        
         return {
             isReady: this.isReady,
             scheduledMessages: this.scheduledMessages.size,
             services: {
-                whatsappWeb: this.config.whatsappWeb.enabled
+                whatsappWeb: this.config.whatsappWeb.enabled,
+                automation: automationStatus ? automationStatus.isReady : false
             },
             config: {
-                whatsappConfigured: this.config.whatsappWeb.enabled
-            }
+                whatsappConfigured: this.config.whatsappWeb.enabled,
+                automationReady: automationStatus ? automationStatus.isReady : false,
+                loggedIn: automationStatus ? automationStatus.isLoggedIn : false
+            },
+            automation: automationStatus
         };
     }
 
@@ -196,6 +267,11 @@ Te rugăm să păstrezi acest bilet pentru verificare.`;
             data.job.destroy();
         }
         this.scheduledMessages.clear();
+        
+        // Destroy WhatsApp automation
+        if (this.whatsappAutomation) {
+            await this.whatsappAutomation.destroy();
+        }
         
         console.log('Alternative Messaging Service destroyed');
     }
