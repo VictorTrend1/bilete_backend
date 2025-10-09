@@ -306,10 +306,10 @@ Te rugăm să păstrezi acest bilet pentru verificare.`;
         }
     }
 
-    async sendTicketViaInfobip(ticketData, phoneNumber, imageUrl = null) {
+    async sendTicketViaInfobip(ticketData, phoneNumber) {
         try {
             console.log('🎫 Sending ticket via Infobip API...');
-            return await this.infobipWhatsApp.sendTicketMessage(ticketData, phoneNumber, imageUrl);
+            return await this.infobipWhatsApp.sendTicketMessage(ticketData, phoneNumber);
         } catch (error) {
             console.error('❌ Error sending ticket via Infobip:', error);
             throw error;

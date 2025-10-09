@@ -158,28 +158,28 @@ class InfobipWhatsApp {
         }
     }
 
-    async sendTicketMessage(ticketData, phoneNumber, imageUrl = null) {
+    async sendTicketMessage(ticketData, phoneNumber, baseUrl = 'https://www.site-bilete.shop') {
         try {
-            const message = this.formatTicketMessage(ticketData);
-            return await this.sendMessage(phoneNumber, message, imageUrl);
+            const message = this.formatTicketMessage(ticketData, baseUrl);
+            return await this.sendMessage(phoneNumber, message);
         } catch (error) {
             console.error('❌ Error sending ticket message:', error);
             throw error;
         }
     }
 
-    formatTicketMessage(ticketData) {
-        return `🎫 *Bilet BAL*
+    formatTicketMessage(ticketData, baseUrl = 'https://www.site-bilete.shop') {
+        const ticketLink = `${baseUrl}/verificare.html?id=${ticketData._id}`;
+        const downloadLink = `${baseUrl}/api/tickets/${ticketData._id}/qr.png`;
+        
+        return `*Bilet BAL*
 
-👤 *Nume:* ${ticketData.nume}
-📞 *Telefon:* ${ticketData.telefon}
-🎫 *Tip bilet:* ${ticketData.tip_bilet}
-📅 *Data creării:* ${new Date(ticketData.created_at).toLocaleDateString('ro-RO')}
+*Nume:* ${ticketData.nume}
+*Telefon:* ${ticketData.telefon}
+*Tip bilet:* ${ticketData.tip_bilet}
 
-✅ Biletul dumneavoastră este gata!
-📱 Păstrați acest mesaj pentru validare.
-
-_Mesaj automat trimis prin sistemul de bilete_`;
+*Vezi biletul complet:* ${ticketLink}
+*Descarcă biletul:* ${downloadLink}`;
     }
 
     formatPhoneNumber(phoneNumber) {

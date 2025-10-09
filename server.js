@@ -400,14 +400,14 @@ app.post('/api/infobip/send-message', authenticateToken, async (req, res) => {
 
 app.post('/api/infobip/send-ticket', authenticateToken, async (req, res) => {
     try {
-        const { ticketData, phoneNumber, imageUrl } = req.body;
+        const { ticketData, phoneNumber } = req.body;
         
         if (!ticketData || !phoneNumber) {
             return res.status(400).json({ error: 'Ticket data and phone number are required' });
         }
         
         console.log(`Sending ticket via Infobip to ${phoneNumber}...`);
-        const result = await messagingService.sendTicketViaInfobip(ticketData, phoneNumber, imageUrl);
+        const result = await messagingService.sendTicketViaInfobip(ticketData, phoneNumber);
         
         res.json({
             success: true,
