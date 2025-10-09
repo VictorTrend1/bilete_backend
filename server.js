@@ -82,7 +82,9 @@ const ticketSchema = new mongoose.Schema({
     timestamp: { type: Date, default: Date.now },
     verified: { type: Boolean, default: true }
   }],
-  flagged: { type: Boolean, default: false }
+  flagged: { type: Boolean, default: false },
+  sent: { type: Boolean, default: false },
+  sent_at: { type: Date }
 }, { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 
 
@@ -947,6 +949,39 @@ app.get('/api/tickets/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// Update ticket sent status
+app.put('/api/tickets/:id/sent', authenticateToken, async (req, res) => {
+  try {
+    const { sent } = req.body;
+    const ticket = await Ticket.findOne({ _id: req.params.id, group: req.user.group });
+    
+    if (!ticket) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+    
+    ticket.sent = sent;
+    if (sent) {
+      ticket.sent_at = new Date();
+    } else {
+      ticket.sent_at = null;
+    }
+    
+    await ticket.save();
+    
+    res.json({
+      success: true,
+      message: `Ticket ${sent ? 'marked as sent' : 'marked as not sent'}`,
+      ticket: {
+        id: ticket._id,
+        sent: ticket.sent,
+        sent_at: ticket.sent_at
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 // Verify ticket (for organizers)
 app.post('/api/verify-ticket', async (req, res) => {
   const { qrData } = req.body;
@@ -1039,6 +1074,50 @@ app.get('/api/admin/tickets', authenticateToken, async (req, res) => {
   try {
     const tickets = await Ticket.find({}).sort({ created_at: 1 }).populate('user_id', 'username');
     res.json({ tickets });
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Calculate total cost for tickets
+app.get('/api/tickets/cost', authenticateToken, async (req, res) => {
+  try {
+    const tickets = await Ticket.find({ group: req.user.group });
+    
+    const costMapping = {
+      'BAL + AFTER': 160,
+      'BAL + AFTER VIP': 160,
+      'AFTER': 120,
+      'AFTER VIP': 120,
+      'BAL': 60
+    };
+    
+    let totalCost = 0;
+    const costBreakdown = {};
+    
+    tickets.forEach(ticket => {
+      const cost = costMapping[ticket.tip_bilet] || 0;
+      totalCost += cost;
+      
+      if (!costBreakdown[ticket.tip_bilet]) {
+        costBreakdown[ticket.tip_bilet] = { count: 0, total: 0 };
+      }
+      costBreakdown[ticket.tip_bilet].count += 1;
+      costBreakdown[ticket.tip_bilet].total += cost;
+    });
+    
+    res.json({
+      success: true,
+      totalCost,
+      costBreakdown,
+      totalTickets: tickets.length,
+      breakdown: Object.keys(costBreakdown).map(ticketType => ({
+        ticketType,
+        count: costBreakdown[ticketType].count,
+        total: costBreakdown[ticketType].total,
+        unitPrice: costMapping[ticketType] || 0
+      }))
+    });
   } catch (error) {
     res.status(500).json({ error: 'Database error' });
   }
