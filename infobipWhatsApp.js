@@ -4,7 +4,7 @@ class InfobipWhatsApp {
     constructor() {
         this.apiKey = '9c07e3f020f4c442cb5f403877594043-f75f9f0b-801d-43b9-8541-262efed26215';
         this.baseUrl = 'https://g93ze8.api.infobip.com';
-        this.sender = '40730749673'; // Your WhatsApp Business number
+        this.sender = '447860088970'; // Your WhatsApp Business number
         this.isReady = true;
     }
 
