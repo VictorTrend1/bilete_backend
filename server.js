@@ -934,6 +934,19 @@ app.get('/api/tickets', authenticateToken, async (req, res) => {
   }
 });
 
+// Get single ticket by ID
+app.get('/api/tickets/:id', authenticateToken, async (req, res) => {
+  try {
+    const ticket = await Ticket.findOne({ _id: req.params.id, group: req.user.group }).populate('user_id', 'username');
+    if (!ticket) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+    res.json(ticket);
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 // Verify ticket (for organizers)
 app.post('/api/verify-ticket', async (req, res) => {
   const { qrData } = req.body;
