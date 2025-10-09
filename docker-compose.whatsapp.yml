@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  whatsapp-automation:
+    build:
+      context: .
+      dockerfile: Dockerfile.whatsapp
+    container_name: whatsapp-automation
+    ports:
+      - "3001:3001"  # API server
+      - "5900:5900"  # VNC server (optional)
+    environment:
+      - NODE_ENV=production
+      - DISPLAY=:99
+      - CHROME_PATH=/usr/bin/google-chrome-stable
+    volumes:
+      - ./data:/app/data  # Persist WhatsApp session
+      - ./logs:/app/logs  # Log files
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+    networks:
+      - whatsapp-network
+
+networks:
+  whatsapp-network:
+    driver: bridge

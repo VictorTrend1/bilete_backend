@@ -355,6 +355,106 @@ app.delete('/api/bot/scheduled-messages/:jobId', authenticateToken, (req, res) =
     }
 });
 
+// Infobip WhatsApp API endpoints
+app.post('/api/infobip/test-connection', authenticateToken, async (req, res) => {
+    try {
+        if (!serviceInitialized) {
+            return res.status(503).json({ error: 'Messaging service not initialized' });
+        }
+        
+        console.log('Testing Infobip API connection...');
+        const result = await messagingService.testInfobipConnection();
+        
+        res.json({
+            success: result.success,
+            message: result.success ? 'Infobip API connection successful' : 'Infobip API connection failed',
+            data: result
+        });
+    } catch (error) {
+        console.error('Error testing Infobip connection:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/infobip/send-message', authenticateToken, async (req, res) => {
+    try {
+        const { phoneNumber, message, imageUrl } = req.body;
+        
+        if (!phoneNumber || !message) {
+            return res.status(400).json({ error: 'Phone number and message are required' });
+        }
+        
+        console.log(`Sending message via Infobip to ${phoneNumber}...`);
+        const result = await messagingService.sendMessageViaInfobip(phoneNumber, message, imageUrl);
+        
+        res.json({
+            success: true,
+            message: 'Message sent via Infobip API',
+            data: result
+        });
+    } catch (error) {
+        console.error('Error sending message via Infobip:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/infobip/send-ticket', authenticateToken, async (req, res) => {
+    try {
+        const { ticketData, phoneNumber, imageUrl } = req.body;
+        
+        if (!ticketData || !phoneNumber) {
+            return res.status(400).json({ error: 'Ticket data and phone number are required' });
+        }
+        
+        console.log(`Sending ticket via Infobip to ${phoneNumber}...`);
+        const result = await messagingService.sendTicketViaInfobip(ticketData, phoneNumber, imageUrl);
+        
+        res.json({
+            success: true,
+            message: 'Ticket sent via Infobip API',
+            data: result
+        });
+    } catch (error) {
+        console.error('Error sending ticket via Infobip:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/infobip/send-bulk', authenticateToken, async (req, res) => {
+    try {
+        const { messages } = req.body;
+        
+        if (!messages || !Array.isArray(messages)) {
+            return res.status(400).json({ error: 'Messages array is required' });
+        }
+        
+        console.log(`Sending ${messages.length} messages via Infobip...`);
+        const result = await messagingService.sendBulkMessagesViaInfobip(messages);
+        
+        res.json({
+            success: true,
+            message: `Bulk messages sent via Infobip API`,
+            data: result
+        });
+    } catch (error) {
+        console.error('Error sending bulk messages via Infobip:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/infobip/status', authenticateToken, async (req, res) => {
+    try {
+        const status = await messagingService.getInfobipStatus();
+        res.json({
+            success: true,
+            data: status
+        });
+    } catch (error) {
+        console.error('Error getting Infobip status:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Send QR code via bot
 app.post('/api/bot/send-qr', authenticateToken, async (req, res) => {
     try {

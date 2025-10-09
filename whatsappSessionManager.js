@@ -2,45 +2,40 @@ const puppeteer = require('puppeteer');
 const fs = require('fs');
 const path = require('path');
 
-class WhatsAppAutomation {
+class WhatsAppSessionManager {
     constructor() {
         this.browser = null;
         this.page = null;
+        this.sessionPath = path.join(__dirname, 'whatsapp-session');
         this.isLoggedIn = false;
-        this.isReady = false;
     }
 
     async initialize() {
         try {
-            console.log('Initializing WhatsApp automation...');
+            console.log('🔐 Initializing WhatsApp session manager...');
             
-            // Launch browser with specific options for WhatsApp Web
+            // Create session directory
+            if (!fs.existsSync(this.sessionPath)) {
+                fs.mkdirSync(this.sessionPath, { recursive: true });
+            }
+
+            // Launch browser with session persistence
             this.browser = await puppeteer.launch({
-                headless: process.env.NODE_ENV === 'production' ? 'new' : false, // Headless for production
-                executablePath: process.env.CHROME_PATH || '/usr/bin/chromium-browser', // Ubuntu path
+                headless: process.env.NODE_ENV === 'production' ? 'new' : false,
+                executablePath: process.env.CHROME_PATH || '/usr/bin/chromium-browser',
+                userDataDir: this.sessionPath, // Persist session data
                 args: [
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
                     '--disable-dev-shm-usage',
-                    '--disable-accelerated-2d-canvas',
-                    '--no-first-run',
-                    '--no-zygote',
-                    '--disable-gpu',
                     '--disable-web-security',
                     '--disable-features=VizDisplayCompositor',
                     '--disable-background-timer-throttling',
                     '--disable-backgrounding-occluded-windows',
                     '--disable-renderer-backgrounding',
-                    '--disable-field-trial-config',
-                    '--disable-ipc-flooding-protection',
                     '--no-default-browser-check',
-                    '--no-pings',
-                    '--password-store=basic',
-                    '--use-mock-keychain',
                     '--disable-extensions',
                     '--disable-plugins',
-                    '--disable-images',
-                    '--disable-javascript',
                     '--disable-default-apps',
                     '--disable-sync',
                     '--disable-translate',
@@ -48,14 +43,10 @@ class WhatsAppAutomation {
                     '--mute-audio',
                     '--no-first-run',
                     '--disable-background-networking',
-                    '--disable-background-timer-throttling',
                     '--disable-client-side-phishing-detection',
-                    '--disable-default-apps',
                     '--disable-hang-monitor',
                     '--disable-prompt-on-repost',
-                    '--disable-sync',
                     '--metrics-recording-only',
-                    '--no-first-run',
                     '--safebrowsing-disable-auto-update',
                     '--enable-automation',
                     '--password-store=basic',
@@ -66,7 +57,7 @@ class WhatsAppAutomation {
 
             this.page = await this.browser.newPage();
             
-            // Set user agent to avoid detection
+            // Set user agent
             await this.page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
             
             // Navigate to WhatsApp Web
@@ -75,136 +66,127 @@ class WhatsAppAutomation {
                 timeout: 30000 
             });
 
-            console.log('WhatsApp Web loaded. Please scan QR code to login...');
+            // Check if already logged in
+            await this.checkLoginStatus();
             
-            // Wait for user to scan QR code and login
-            await this.waitForLogin();
-            
-            this.isReady = true;
-            console.log('WhatsApp automation ready!');
             return true;
             
         } catch (error) {
-            console.error('Failed to initialize WhatsApp automation:', error);
-            this.isReady = false;
+            console.error('❌ Failed to initialize session manager:', error);
+            return false;
+        }
+    }
+
+    async checkLoginStatus() {
+        try {
+            // Wait a bit for page to load
+            await this.page.waitForTimeout(3000);
+            
+            // Check if chat list is visible (indicates login)
+            const chatList = await this.page.$('[data-testid="chat-list"]');
+            if (chatList) {
+                console.log('✅ Already logged in to WhatsApp!');
+                this.isLoggedIn = true;
+                return true;
+            }
+            
+            // Check if QR code is visible (needs login)
+            const qrCode = await this.page.$('[data-testid="qr-code"]');
+            if (qrCode) {
+                console.log('📱 Please scan QR code to login...');
+                await this.waitForLogin();
+                return true;
+            }
+            
+            console.log('⚠️ Unable to determine login status');
+            return false;
+            
+        } catch (error) {
+            console.error('❌ Error checking login status:', error);
             return false;
         }
     }
 
     async waitForLogin() {
         try {
-            // Wait for the main chat interface to load (indicates successful login)
+            console.log('⏳ Waiting for login...');
+            
+            // Wait for chat list to appear (indicates successful login)
             await this.page.waitForSelector('[data-testid="chat-list"]', { 
-                timeout: 120000 // 2 minutes timeout for QR scan
+                timeout: 120000 // 2 minutes
             });
             
-            console.log('Successfully logged in to WhatsApp Web!');
+            console.log('✅ Successfully logged in!');
             this.isLoggedIn = true;
+            return true;
             
         } catch (error) {
-            throw new Error('Login timeout. Please scan QR code within 2 minutes.');
+            console.log('⏰ Login timeout. Please try again.');
+            return false;
         }
     }
 
     async sendMessage(phoneNumber, message, imagePath = null) {
-        if (!this.isReady || !this.isLoggedIn) {
-            throw new Error('WhatsApp automation not ready. Please initialize and login first.');
+        if (!this.isLoggedIn) {
+            throw new Error('Not logged in to WhatsApp. Please scan QR code first.');
         }
 
         try {
-            console.log(`Sending message to ${phoneNumber}...`);
+            console.log(`📤 Sending message to ${phoneNumber}...`);
             
             // Format phone number
             const formattedNumber = this.formatPhoneNumber(phoneNumber);
             
-            // Navigate to chat with the number
+            // Navigate to chat
             const chatUrl = `https://web.whatsapp.com/send?phone=${formattedNumber}`;
             await this.page.goto(chatUrl, { waitUntil: 'networkidle2' });
             
             // Wait for chat to load
             await this.page.waitForSelector('[data-testid="conversation-compose-box-input"]', { timeout: 10000 });
             
-            // Type the message
+            // Type message
             const messageInput = await this.page.$('[data-testid="conversation-compose-box-input"]');
             await messageInput.click();
             await messageInput.type(message);
             
-            // Send image if provided
+            // Attach image if provided
             if (imagePath && fs.existsSync(imagePath)) {
-                console.log('Attaching image...');
+                console.log('📎 Attaching image...');
                 
-                // Click attachment button
                 const attachmentButton = await this.page.$('[data-testid="compose-btn-attach"]');
                 await attachmentButton.click();
                 
-                // Wait for attachment menu
                 await this.page.waitForSelector('[data-testid="popup-controls"]', { timeout: 5000 });
                 
-                // Click on photo/video option
                 const photoButton = await this.page.$('[data-testid="attach-image"]');
                 await photoButton.click();
                 
-                // Wait for file input
                 await this.page.waitForSelector('input[type="file"]', { timeout: 5000 });
                 
-                // Upload the image
                 const fileInput = await this.page.$('input[type="file"]');
                 await fileInput.uploadFile(imagePath);
                 
-                // Wait for image to be attached
                 await this.page.waitForSelector('[data-testid="media-preview"]', { timeout: 10000 });
-                
-                console.log('Image attached successfully');
             }
             
-            // Send the message
+            // Send message
             const sendButton = await this.page.$('[data-testid="send"]');
             await sendButton.click();
             
-            // Wait for message to be sent
             await this.page.waitForTimeout(2000);
             
-            console.log(`Message sent successfully to ${phoneNumber}`);
+            console.log(`✅ Message sent to ${phoneNumber}`);
             return { success: true, message: 'Message sent successfully' };
             
         } catch (error) {
-            console.error('Error sending WhatsApp message:', error);
+            console.error('❌ Error sending message:', error);
             throw new Error(`Failed to send message: ${error.message}`);
         }
     }
 
-    async sendBulkMessages(messages) {
-        const results = [];
-        
-        for (const messageData of messages) {
-            try {
-                const result = await this.sendMessage(
-                    messageData.phoneNumber, 
-                    messageData.message, 
-                    messageData.imagePath
-                );
-                results.push({ ...messageData, status: 'sent', result });
-                
-                // Add delay between messages to avoid rate limiting
-                await this.page.waitForTimeout(3000);
-                
-            } catch (error) {
-                results.push({ 
-                    ...messageData, 
-                    status: 'failed', 
-                    error: error.message 
-                });
-            }
-        }
-        
-        return results;
-    }
-
     formatPhoneNumber(phoneNumber) {
-        // Remove all non-digit characters
         let cleaned = phoneNumber.replace(/\D/g, '');
         
-        // Add country code if not present
         if (cleaned.startsWith('0')) {
             cleaned = '40' + cleaned.substring(1);
         } else if (!cleaned.startsWith('40')) {
@@ -216,8 +198,8 @@ class WhatsAppAutomation {
 
     async getStatus() {
         return {
-            isReady: this.isReady,
             isLoggedIn: this.isLoggedIn,
+            sessionPath: this.sessionPath,
             browserConnected: this.browser ? true : false
         };
     }
@@ -228,10 +210,9 @@ class WhatsAppAutomation {
             this.browser = null;
         }
         this.page = null;
-        this.isReady = false;
         this.isLoggedIn = false;
-        console.log('WhatsApp automation destroyed');
+        console.log('🧹 Session manager destroyed');
     }
 }
 
-module.exports = WhatsAppAutomation;
+module.exports = WhatsAppSessionManager;

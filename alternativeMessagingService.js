@@ -1,11 +1,15 @@
 const cron = require('node-cron');
 const WhatsAppAutomation = require('./whatsappAutomation');
+const WhatsAppSessionManager = require('./whatsappSessionManager');
+const InfobipWhatsApp = require('./infobipWhatsApp');
 
 class AlternativeMessagingService {
     constructor() {
         this.scheduledMessages = new Map();
         this.isReady = false;
         this.whatsappAutomation = new WhatsAppAutomation();
+        this.sessionManager = new WhatsAppSessionManager();
+        this.infobipWhatsApp = new InfobipWhatsApp();
         
         // Configuration for WhatsApp-only messaging
         this.config = {
@@ -49,6 +53,24 @@ class AlternativeMessagingService {
             }
         } catch (error) {
             console.error('Error starting automation:', error);
+            return { success: false, message: error.message };
+        }
+    }
+
+    async startSessionManager() {
+        try {
+            console.log('Starting WhatsApp session manager...');
+            const sessionReady = await this.sessionManager.initialize();
+            
+            if (sessionReady) {
+                console.log('✅ WhatsApp session manager started!');
+                return { success: true, message: 'Session manager started. Check login status.' };
+            } else {
+                console.log('❌ Failed to start session manager');
+                return { success: false, message: 'Failed to start session manager. Check server logs.' };
+            }
+        } catch (error) {
+            console.error('Error starting session manager:', error);
             return { success: false, message: error.message };
         }
     }
@@ -271,6 +293,51 @@ Te rugăm să păstrezi acest bilet pentru verificare.`;
             },
             automation: automationStatus
         };
+    }
+
+    // Infobip WhatsApp API methods
+    async sendMessageViaInfobip(phoneNumber, message, imageUrl = null) {
+        try {
+            console.log('📤 Sending message via Infobip API...');
+            return await this.infobipWhatsApp.sendMessage(phoneNumber, message, imageUrl);
+        } catch (error) {
+            console.error('❌ Error sending message via Infobip:', error);
+            throw error;
+        }
+    }
+
+    async sendTicketViaInfobip(ticketData, phoneNumber, imageUrl = null) {
+        try {
+            console.log('🎫 Sending ticket via Infobip API...');
+            return await this.infobipWhatsApp.sendTicketMessage(ticketData, phoneNumber, imageUrl);
+        } catch (error) {
+            console.error('❌ Error sending ticket via Infobip:', error);
+            throw error;
+        }
+    }
+
+    async sendBulkMessagesViaInfobip(messages) {
+        try {
+            console.log('📤 Sending bulk messages via Infobip API...');
+            return await this.infobipWhatsApp.sendBulkMessages(messages);
+        } catch (error) {
+            console.error('❌ Error sending bulk messages via Infobip:', error);
+            throw error;
+        }
+    }
+
+    async testInfobipConnection() {
+        try {
+            console.log('🔍 Testing Infobip API connection...');
+            return await this.infobipWhatsApp.testConnection();
+        } catch (error) {
+            console.error('❌ Error testing Infobip connection:', error);
+            throw error;
+        }
+    }
+
+    async getInfobipStatus() {
+        return await this.infobipWhatsApp.getStatus();
     }
 
     async destroy() {
