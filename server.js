@@ -357,105 +357,6 @@ app.delete('/api/bot/scheduled-messages/:jobId', authenticateToken, (req, res) =
     }
 });
 
-// Infobip WhatsApp API endpoints
-app.post('/api/infobip/test-connection', authenticateToken, async (req, res) => {
-    try {
-        if (!serviceInitialized) {
-            return res.status(503).json({ error: 'Messaging service not initialized' });
-        }
-        
-        console.log('Testing Infobip API connection...');
-        const result = await messagingService.testInfobipConnection();
-        
-        res.json({
-            success: result.success,
-            message: result.success ? 'Infobip API connection successful' : 'Infobip API connection failed',
-            data: result
-        });
-    } catch (error) {
-        console.error('Error testing Infobip connection:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-app.post('/api/infobip/send-message', authenticateToken, async (req, res) => {
-    try {
-        const { phoneNumber, message, imageUrl } = req.body;
-        
-        if (!phoneNumber || !message) {
-            return res.status(400).json({ error: 'Phone number and message are required' });
-        }
-        
-        console.log(`Sending message via Infobip to ${phoneNumber}...`);
-        const result = await messagingService.sendMessageViaInfobip(phoneNumber, message, imageUrl);
-        
-        res.json({
-            success: true,
-            message: 'Message sent via Infobip API',
-            data: result
-        });
-    } catch (error) {
-        console.error('Error sending message via Infobip:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-app.post('/api/infobip/send-ticket', authenticateToken, async (req, res) => {
-    try {
-        const { ticketData, phoneNumber } = req.body;
-        
-        if (!ticketData || !phoneNumber) {
-            return res.status(400).json({ error: 'Ticket data and phone number are required' });
-        }
-        
-        console.log(`Sending ticket via Infobip to ${phoneNumber}...`);
-        const result = await messagingService.sendTicketViaInfobip(ticketData, phoneNumber);
-        
-        res.json({
-            success: true,
-            message: 'Ticket sent via Infobip API',
-            data: result
-        });
-    } catch (error) {
-        console.error('Error sending ticket via Infobip:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-app.post('/api/infobip/send-bulk', authenticateToken, async (req, res) => {
-    try {
-        const { messages } = req.body;
-        
-        if (!messages || !Array.isArray(messages)) {
-            return res.status(400).json({ error: 'Messages array is required' });
-        }
-        
-        console.log(`Sending ${messages.length} messages via Infobip...`);
-        const result = await messagingService.sendBulkMessagesViaInfobip(messages);
-        
-        res.json({
-            success: true,
-            message: `Bulk messages sent via Infobip API`,
-            data: result
-        });
-    } catch (error) {
-        console.error('Error sending bulk messages via Infobip:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-app.get('/api/infobip/status', authenticateToken, async (req, res) => {
-    try {
-        const status = await messagingService.getInfobipStatus();
-        res.json({
-            success: true,
-            data: status
-        });
-    } catch (error) {
-        console.error('Error getting Infobip status:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
 
 // Send QR code via bot
 app.post('/api/bot/send-qr', authenticateToken, async (req, res) => {
@@ -836,9 +737,9 @@ app.get('/api/tickets/:id/public', async (req, res) => {
   }
 });
 
-app.get('/api/tickets/:id/custom-bal-public', async (req, res) => {
+app.get('/api/tickets/:id/custom-public', async (req, res) => {
   try {
-    console.log(`🎫 Generating custom BAL ticket for ID: ${req.params.id}`);
+    console.log(`🎫 Generating custom ticket for ID: ${req.params.id}`);
     
     const ticket = await Ticket.findById(req.params.id);
     if (!ticket) {
@@ -848,11 +749,8 @@ app.get('/api/tickets/:id/custom-bal-public', async (req, res) => {
 
     console.log(`📋 Ticket found: ${ticket.nume} (${ticket.tip_bilet})`);
 
-    // Only generate custom ticket for BAL type
-    if (ticket.tip_bilet !== 'BAL') {
-      console.log(`⚠️ Custom ticket generation only available for BAL tickets, got: ${ticket.tip_bilet}`);
-      return res.status(400).json({ error: 'Custom ticket generation only available for BAL tickets' });
-    }
+    // Generate custom ticket for all ticket types
+    console.log(`🎫 Generating custom ticket for ${ticket.tip_bilet} ticket`);
 
     // Load the template image
     const templatePath = path.join(__dirname, 'model_bilet.jpg');
@@ -938,10 +836,10 @@ app.get('/api/tickets/:id/custom-bal-public', async (req, res) => {
     res.set('Content-Type', 'image/png');
     res.set('Content-Disposition', `attachment; filename="bilet-${ticket.nume}-${ticket._id}.png"`);
     res.send(buffer);
-    console.log(`🎉 Custom ticket sent successfully for ${ticket.nume}`);
+    console.log(`🎉 Custom ticket generated successfully for ${ticket.nume}`);
     
   } catch (error) {
-    console.error('❌ Custom BAL ticket generation error:', error);
+    console.error('❌ Custom ticket generation error:', error);
     res.status(500).json({ error: 'Failed to generate custom ticket' });
   }
 });
@@ -959,28 +857,9 @@ app.get('/api/tickets/:id/preview', async (req, res) => {
 
     console.log(`📋 Ticket found: ${ticket.nume} (${ticket.tip_bilet})`);
 
-    // For BAL tickets, use the custom template
-    if (ticket.tip_bilet === 'BAL') {
-      console.log(`🎨 Redirecting to custom BAL ticket generation`);
-      return res.redirect(`/api/tickets/${ticket._id}/custom-bal-public`);
-    }
-
-    // For other ticket types, return ticket information as JSON
-    console.log(`📄 Returning ticket info for non-BAL ticket: ${ticket.tip_bilet}`);
-    res.json({
-      success: true,
-      ticket: {
-        _id: ticket._id,
-        nume: ticket.nume,
-        telefon: ticket.telefon,
-        tip_bilet: ticket.tip_bilet,
-        group: ticket.group,
-        verified: ticket.verified,
-        created_at: ticket.created_at,
-        qr_code: ticket.qr_code
-      },
-      message: 'Preview available for BAL tickets only. Use QR code for verification.'
-    });
+    // For all tickets, use the custom template
+    console.log(`🎨 Redirecting to custom ticket generation`);
+    return res.redirect(`/api/tickets/${ticket._id}/custom-public`);
     
   } catch (error) {
     console.error('❌ Ticket preview generation error:', error);
@@ -1253,50 +1132,6 @@ app.get('/api/tickets/filtered', authenticateToken, async (req, res) => {
       tickets,
       filter,
       count: tickets.length
-    });
-  } catch (error) {
-    res.status(500).json({ error: 'Database error' });
-  }
-});
-
-// Calculate total cost for tickets
-app.get('/api/tickets/cost', authenticateToken, async (req, res) => {
-  try {
-    const tickets = await Ticket.find({ group: req.user.group });
-    
-    const costMapping = {
-      'BAL + AFTER': 160,
-      'BAL + AFTER VIP': 160,
-      'AFTER': 120,
-      'AFTER VIP': 120,
-      'BAL': 60
-    };
-    
-    let totalCost = 0;
-    const costBreakdown = {};
-    
-    tickets.forEach(ticket => {
-      const cost = costMapping[ticket.tip_bilet] || 0;
-      totalCost += cost;
-      
-      if (!costBreakdown[ticket.tip_bilet]) {
-        costBreakdown[ticket.tip_bilet] = { count: 0, total: 0 };
-      }
-      costBreakdown[ticket.tip_bilet].count += 1;
-      costBreakdown[ticket.tip_bilet].total += cost;
-    });
-    
-    res.json({
-      success: true,
-      totalCost,
-      costBreakdown,
-      totalTickets: tickets.length,
-      breakdown: Object.keys(costBreakdown).map(ticketType => ({
-        ticketType,
-        count: costBreakdown[ticketType].count,
-        total: costBreakdown[ticketType].total,
-        unitPrice: costMapping[ticketType] || 0
-      }))
     });
   } catch (error) {
     res.status(500).json({ error: 'Database error' });

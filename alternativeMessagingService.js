@@ -1,7 +1,6 @@
 const cron = require('node-cron');
 const WhatsAppAutomation = require('./whatsappAutomation');
 const WhatsAppSessionManager = require('./whatsappSessionManager');
-const InfobipWhatsApp = require('./infobipWhatsApp');
 
 class AlternativeMessagingService {
     constructor() {
@@ -9,7 +8,6 @@ class AlternativeMessagingService {
         this.isReady = false;
         this.whatsappAutomation = new WhatsAppAutomation();
         this.sessionManager = new WhatsAppSessionManager();
-        this.infobipWhatsApp = new InfobipWhatsApp();
         
         // Configuration for WhatsApp-only messaging
         this.config = {
@@ -90,19 +88,15 @@ class AlternativeMessagingService {
     }
 
     createTicketMessage(ticketData) {
-        const { nume, telefon, tip_bilet, created_at } = ticketData;
-        const date = new Date(created_at).toLocaleDateString('ro-RO');
+        const { nume, telefon, tip_bilet } = ticketData;
         
-        return `🎫 Biletul tău pentru eveniment
+        return `*Bilet ${tip_bilet}*
 
-👤 Nume: ${nume}
-📱 Telefon: ${telefon}
-🎟️ Tip bilet: ${tip_bilet}
-📅 Data creării: ${date}
+*Nume:* ${nume}
+*Telefon:* ${telefon}
+*Tip bilet:* ${tip_bilet}
 
-✅ Biletul este valid și poate fi folosit la intrare.
-
-Te rugăm să păstrezi acest bilet pentru verificare.`;
+*Vezi și descarcă biletul:* https://www.site-bilete.shop/api/tickets/${ticketData._id}/custom-public`;
     }
 
     // WhatsApp Web link generation (primary method)
@@ -295,50 +289,6 @@ Te rugăm să păstrezi acest bilet pentru verificare.`;
         };
     }
 
-    // Infobip WhatsApp API methods
-    async sendMessageViaInfobip(phoneNumber, message, imageUrl = null) {
-        try {
-            console.log('📤 Sending message via Infobip API...');
-            return await this.infobipWhatsApp.sendMessage(phoneNumber, message, imageUrl);
-        } catch (error) {
-            console.error('❌ Error sending message via Infobip:', error);
-            throw error;
-        }
-    }
-
-    async sendTicketViaInfobip(ticketData, phoneNumber) {
-        try {
-            console.log('🎫 Sending ticket via Infobip API...');
-            return await this.infobipWhatsApp.sendTicketMessage(ticketData, phoneNumber);
-        } catch (error) {
-            console.error('❌ Error sending ticket via Infobip:', error);
-            throw error;
-        }
-    }
-
-    async sendBulkMessagesViaInfobip(messages) {
-        try {
-            console.log('📤 Sending bulk messages via Infobip API...');
-            return await this.infobipWhatsApp.sendBulkMessages(messages);
-        } catch (error) {
-            console.error('❌ Error sending bulk messages via Infobip:', error);
-            throw error;
-        }
-    }
-
-    async testInfobipConnection() {
-        try {
-            console.log('🔍 Testing Infobip API connection...');
-            return await this.infobipWhatsApp.testConnection();
-        } catch (error) {
-            console.error('❌ Error testing Infobip connection:', error);
-            throw error;
-        }
-    }
-
-    async getInfobipStatus() {
-        return await this.infobipWhatsApp.getStatus();
-    }
 
     async destroy() {
         // Cancel all scheduled messages
