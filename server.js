@@ -1079,6 +1079,39 @@ app.get('/api/admin/tickets', authenticateToken, async (req, res) => {
   }
 });
 
+// Get tickets with filtering by sent status
+app.get('/api/tickets/filtered', authenticateToken, async (req, res) => {
+  try {
+    const { filter } = req.query; // 'all', 'sent', 'not-sent'
+    
+    let query = { group: req.user.group };
+    
+    switch(filter) {
+      case 'sent':
+        query.sent = true;
+        break;
+      case 'not-sent':
+        query.sent = { $ne: true };
+        break;
+      case 'all':
+      default:
+        // No additional filter
+        break;
+    }
+    
+    const tickets = await Ticket.find(query).sort({ created_at: -1 }).populate('user_id', 'username');
+    
+    res.json({
+      success: true,
+      tickets,
+      filter,
+      count: tickets.length
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 // Calculate total cost for tickets
 app.get('/api/tickets/cost', authenticateToken, async (req, res) => {
   try {
