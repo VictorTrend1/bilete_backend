@@ -4,6 +4,7 @@ class InfobipWhatsApp {
     constructor() {
         this.apiKey = '9c07e3f020f4c442cb5f403877594043-f75f9f0b-801d-43b9-8541-262efed26215';
         this.baseUrl = 'https://g93ze8.api.infobip.com';
+        this.sender = '40730749673'; // Your WhatsApp Business number
         this.isReady = true;
     }
 
@@ -16,7 +17,7 @@ class InfobipWhatsApp {
             let messageData = {
                 messages: [
                     {
-                        from: "447860099299", // Your WhatsApp Business number (update this)
+                        from: this.sender, // Your WhatsApp Business number
                         to: formattedNumber,
                         content: {
                             type: "text",
@@ -99,7 +100,7 @@ class InfobipWhatsApp {
             const messageData = {
                 messages: [
                     {
-                        from: "447860099299", // Your WhatsApp Business number
+                        from: this.sender, // Your WhatsApp Business number
                         to: formattedNumber,
                         content: {
                             type: "template",
@@ -184,6 +185,7 @@ _Mesaj automat trimis prin sistemul de bilete_`;
             cleaned = '40' + cleaned;
         }
         
+        // Ensure it's a valid format for Infobip
         return cleaned;
     }
 
