@@ -513,8 +513,55 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
-    uptime: process.uptime()
+    uptime: process.uptime(),
+    service: 'Site Bilete Backend',
+    version: '1.0.0',
+    features: {
+      ticketPreview: true,
+      customBALTickets: true,
+      publicAccess: true
+    }
   });
+});
+
+// Ticket preview system health check
+app.get('/api/tickets/preview/health', async (req, res) => {
+  try {
+    // Check if template file exists
+    const templatePath = path.join(__dirname, 'model_bilet.jpg');
+    const templateExists = fs.existsSync(templatePath);
+    
+    // Check if fonts directory exists
+    const fontsDir = path.join(__dirname, 'fonts');
+    const fontsExist = fs.existsSync(fontsDir);
+    
+    // Check database connection
+    const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
+    
+    res.json({
+      status: 'OK',
+      timestamp: new Date().toISOString(),
+      service: 'Ticket Preview System',
+      checks: {
+        templateFile: templateExists,
+        fontsDirectory: fontsExist,
+        database: dbStatus,
+        jimp: 'available',
+        qrcode: 'available'
+      },
+      endpoints: {
+        public: '/api/tickets/:id/public',
+        preview: '/api/tickets/:id/preview',
+        customBAL: '/api/tickets/:id/custom-bal-public'
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'ERROR',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // User registration
@@ -757,26 +804,68 @@ app.get('/api/tickets/:id/qr.png', async (req, res) => {
 });
 
 // Public custom BAL ticket generation (no auth required for sharing)
-app.get('/api/tickets/:id/custom-bal-public', async (req, res) => {
+// Public endpoint to get ticket data for verification page
+app.get('/api/tickets/:id/public', async (req, res) => {
   try {
+    console.log(`📋 Fetching public ticket data for ID: ${req.params.id}`);
+    
     const ticket = await Ticket.findById(req.params.id);
     if (!ticket) {
+      console.log(`❌ Ticket not found: ${req.params.id}`);
       return res.status(404).json({ error: 'Ticket not found' });
     }
 
+    console.log(`✅ Ticket found: ${ticket.nume} (${ticket.tip_bilet})`);
+
+    // Return ticket data without sensitive information
+    res.json({
+      success: true,
+      ticket: {
+        _id: ticket._id,
+        nume: ticket.nume,
+        telefon: ticket.telefon,
+        tip_bilet: ticket.tip_bilet,
+        group: ticket.group,
+        verified: ticket.verified,
+        created_at: ticket.created_at
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error fetching public ticket data:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.get('/api/tickets/:id/custom-bal-public', async (req, res) => {
+  try {
+    console.log(`🎫 Generating custom BAL ticket for ID: ${req.params.id}`);
+    
+    const ticket = await Ticket.findById(req.params.id);
+    if (!ticket) {
+      console.log(`❌ Ticket not found: ${req.params.id}`);
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+
+    console.log(`📋 Ticket found: ${ticket.nume} (${ticket.tip_bilet})`);
+
     // Only generate custom ticket for BAL type
     if (ticket.tip_bilet !== 'BAL') {
+      console.log(`⚠️ Custom ticket generation only available for BAL tickets, got: ${ticket.tip_bilet}`);
       return res.status(400).json({ error: 'Custom ticket generation only available for BAL tickets' });
     }
 
     // Load the template image
     const templatePath = path.join(__dirname, 'model_bilet.jpg');
+    console.log(`📁 Loading template from: ${templatePath}`);
     const template = await Jimp.read(templatePath);
+    console.log(`✅ Template loaded: ${template.getWidth()}x${template.getHeight()}`);
     
     // Calculate QR code size (square from 1049,270 to 1424,638)
     const qrSize = 1424 - 1049; // 375 pixels
+    console.log(`🔲 QR code size: ${qrSize}x${qrSize} pixels`);
     
     // Generate QR code as buffer with correct size
+    console.log(`🔗 Generating QR code for: ${ticket.qr_code}`);
     const qrBuffer = await QRCode.toBuffer(ticket.qr_code, {
       type: 'png',
       errorCorrectionLevel: 'H',
@@ -788,23 +877,29 @@ app.get('/api/tickets/:id/custom-bal-public', async (req, res) => {
       },
       width: qrSize // Use calculated size to fit the template box
     });
+    console.log(`✅ QR code generated: ${qrBuffer.length} bytes`);
     
     // Load QR code image
     const qrImage = await Jimp.read(qrBuffer);
+    console.log(`✅ QR image loaded: ${qrImage.getWidth()}x${qrImage.getHeight()}`);
     
     // Load Benzin-BOLD font for name (bolder, more prominent)
     let font;
     try {
       // Try to load Benzin-BOLD font if available
+      console.log(`🔤 Loading Benzin-BOLD font...`);
       font = await Jimp.loadFont(path.join(__dirname, 'fonts', 'benzin-bold.ttf'));
+      console.log(`✅ Benzin-BOLD font loaded successfully`);
     } catch (error) {
-      console.log('Benzin-BOLD font not found, using fallback font');
+      console.log(`⚠️ Benzin-BOLD font not found, using fallback font: ${error.message}`);
       // Fallback to a bolder built-in font
       font = await Jimp.loadFont(Jimp.FONT_SANS_64_WHITE);
+      console.log(`✅ Fallback font loaded`);
     }
     
     // Clone template to avoid modifying original
     const customTicket = template.clone();
+    console.log(`🔄 Template cloned for customization`);
     
     // Position for QR code (from template coordinates)
     const qrX = 1049;  // X position for QR code
@@ -818,8 +913,14 @@ app.get('/api/tickets/:id/custom-bal-public', async (req, res) => {
     const textBoxWidth = 928 - 84;  // 844 pixels wide
     const textBoxHeight = 566 - 334; // 232 pixels tall
     
+    console.log(`🎨 Composing ticket elements...`);
+    console.log(`📍 QR code position: (${qrX}, ${qrY})`);
+    console.log(`📍 Name position: (${nameX}, ${nameY}) in box ${textBoxWidth}x${textBoxHeight}`);
+    console.log(`📝 Name text: "${ticket.nume.toUpperCase()}"`);
+    
     // Composite QR code onto template
     customTicket.composite(qrImage, qrX, qrY);
+    console.log(`✅ QR code composited`);
     
     // Add name text centered in the text box (uppercase, white, bold)
     customTicket.print(font, nameX, nameY, {
@@ -827,17 +928,63 @@ app.get('/api/tickets/:id/custom-bal-public', async (req, res) => {
       alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER,
       alignmentY: Jimp.VERTICAL_ALIGN_MIDDLE
     }, textBoxWidth, textBoxHeight);
+    console.log(`✅ Name text rendered`);
     
     // Get buffer and send as PNG
+    console.log(`💾 Generating final image buffer...`);
     const buffer = await customTicket.getBufferAsync(Jimp.MIME_PNG);
+    console.log(`✅ Final image generated: ${buffer.length} bytes`);
     
     res.set('Content-Type', 'image/png');
     res.set('Content-Disposition', `attachment; filename="bilet-${ticket.nume}-${ticket._id}.png"`);
     res.send(buffer);
+    console.log(`🎉 Custom ticket sent successfully for ${ticket.nume}`);
     
   } catch (error) {
-    console.error('Custom BAL ticket generation error:', error);
+    console.error('❌ Custom BAL ticket generation error:', error);
     res.status(500).json({ error: 'Failed to generate custom ticket' });
+  }
+});
+
+// Generic ticket preview for all ticket types (public access)
+app.get('/api/tickets/:id/preview', async (req, res) => {
+  try {
+    console.log(`🎫 Generating ticket preview for ID: ${req.params.id}`);
+    
+    const ticket = await Ticket.findById(req.params.id);
+    if (!ticket) {
+      console.log(`❌ Ticket not found: ${req.params.id}`);
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+
+    console.log(`📋 Ticket found: ${ticket.nume} (${ticket.tip_bilet})`);
+
+    // For BAL tickets, use the custom template
+    if (ticket.tip_bilet === 'BAL') {
+      console.log(`🎨 Redirecting to custom BAL ticket generation`);
+      return res.redirect(`/api/tickets/${ticket._id}/custom-bal-public`);
+    }
+
+    // For other ticket types, return ticket information as JSON
+    console.log(`📄 Returning ticket info for non-BAL ticket: ${ticket.tip_bilet}`);
+    res.json({
+      success: true,
+      ticket: {
+        _id: ticket._id,
+        nume: ticket.nume,
+        telefon: ticket.telefon,
+        tip_bilet: ticket.tip_bilet,
+        group: ticket.group,
+        verified: ticket.verified,
+        created_at: ticket.created_at,
+        qr_code: ticket.qr_code
+      },
+      message: 'Preview available for BAL tickets only. Use QR code for verification.'
+    });
+    
+  } catch (error) {
+    console.error('❌ Ticket preview generation error:', error);
+    res.status(500).json({ error: 'Failed to generate ticket preview' });
   }
 });
 
