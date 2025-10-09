@@ -13,6 +13,7 @@ class InfobipWhatsApp {
             console.log(`📤 Sending WhatsApp message via Infobip to ${phoneNumber}...`);
             
             const formattedNumber = this.formatPhoneNumber(phoneNumber);
+            console.log(`Formatted number: ${formattedNumber}, Sender: ${this.sender}`);
             
             let messageData = {
                 messages: [
@@ -38,6 +39,8 @@ class InfobipWhatsApp {
                 };
             }
 
+            console.log('Message data being sent:', JSON.stringify(messageData, null, 2));
+            
             const response = await axios.post(
                 `${this.baseUrl}/whatsapp/1/message/text`,
                 messageData,
@@ -60,7 +63,12 @@ class InfobipWhatsApp {
 
         } catch (error) {
             console.error('❌ Error sending WhatsApp message:', error.response?.data || error.message);
-            throw new Error(`Failed to send message: ${error.response?.data?.requestError?.serviceException?.text || error.message}`);
+            console.error('Full error details:', JSON.stringify(error.response?.data, null, 2));
+            const errorMessage = error.response?.data?.requestError?.serviceException?.text || 
+                                error.response?.data?.requestError?.serviceException?.messageId ||
+                                JSON.stringify(error.response?.data) || 
+                                error.message;
+            throw new Error(`Failed to send message: ${errorMessage}`);
         }
     }
 
