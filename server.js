@@ -752,14 +752,47 @@ app.get('/api/tickets/:id/custom-public', async (req, res) => {
     // Generate custom ticket for all ticket types
     console.log(`🎫 Generating custom ticket for ${ticket.tip_bilet} ticket`);
 
-    // Load the template image
-    const templatePath = path.join(__dirname, 'model_bilet.jpg');
-    console.log(`📁 Loading template from: ${templatePath}`);
+    // Load the appropriate template image based on ticket type
+    let templatePath, qrSize, qrX, qrY, nameX, nameY, textBoxWidth, textBoxHeight;
+    
+    if (ticket.tip_bilet === 'AFTER') {
+      // Use after.png template for AFTER tickets
+      templatePath = path.join(__dirname, 'after.png');
+      console.log(`📁 Loading AFTER template from: ${templatePath}`);
+      
+      // Calculate QR code size (square from x1042, y238 to x1428, y643)
+      qrSize = 1428 - 1042; // 386 pixels
+      qrX = 1042;  // X position for QR code
+      qrY = 238;   // Y position for QR code
+      
+      // Position for name (from after.png template coordinates)
+      nameX = 72;   // X position for name (left edge of text box)
+      nameY = 324;  // Y position for name (top edge of text box)
+      
+      // Calculate text box dimensions for proper centering
+      textBoxWidth = 941 - 72;  // 869 pixels wide
+      textBoxHeight = 579 - 324; // 255 pixels tall
+    } else {
+      // Use model_bilet.jpg template for other ticket types
+      templatePath = path.join(__dirname, 'model_bilet.jpg');
+      console.log(`📁 Loading BAL template from: ${templatePath}`);
+      
+      // Calculate QR code size (square from 1049,270 to 1424,638)
+      qrSize = 1424 - 1049; // 375 pixels
+      qrX = 1049;  // X position for QR code
+      qrY = 270;   // Y position for QR code
+      
+      // Position for name (from template coordinates - center in the text box)
+      nameX = 84;   // X position for name (left edge of text box)
+      nameY = 334;  // Y position for name (top edge of text box)
+      
+      // Calculate text box dimensions for proper centering
+      textBoxWidth = 928 - 84;  // 844 pixels wide
+      textBoxHeight = 566 - 334; // 232 pixels tall
+    }
+    
     const template = await Jimp.read(templatePath);
     console.log(`✅ Template loaded: ${template.getWidth()}x${template.getHeight()}`);
-    
-    // Calculate QR code size (square from 1049,270 to 1424,638)
-    const qrSize = 1424 - 1049; // 375 pixels
     console.log(`🔲 QR code size: ${qrSize}x${qrSize} pixels`);
     
     // Generate QR code as buffer with correct size
@@ -798,18 +831,6 @@ app.get('/api/tickets/:id/custom-public', async (req, res) => {
     // Clone template to avoid modifying original
     const customTicket = template.clone();
     console.log(`🔄 Template cloned for customization`);
-    
-    // Position for QR code (from template coordinates)
-    const qrX = 1049;  // X position for QR code
-    const qrY = 270;   // Y position for QR code
-    
-    // Position for name (from template coordinates - center in the text box)
-    const nameX = 84;   // X position for name (left edge of text box)
-    const nameY = 334;  // Y position for name (top edge of text box)
-    
-    // Calculate text box dimensions for proper centering
-    const textBoxWidth = 928 - 84;  // 844 pixels wide
-    const textBoxHeight = 566 - 334; // 232 pixels tall
     
     console.log(`🎨 Composing ticket elements...`);
     console.log(`📍 QR code position: (${qrX}, ${qrY})`);
@@ -949,6 +970,117 @@ app.get('/api/tickets/:id/custom-bal', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Custom BAL ticket generation error:', error);
     res.status(500).json({ error: 'Failed to generate custom ticket' });
+  }
+});
+
+// Custom AFTER ticket generation with after.png template
+app.get('/api/tickets/:id/custom-after', authenticateToken, async (req, res) => {
+  try {
+    console.log(`🎫 Generating custom AFTER ticket for ID: ${req.params.id}`);
+    
+    const ticket = await Ticket.findOne({ _id: req.params.id, group: req.user.group });
+    if (!ticket) {
+      console.log(`❌ Ticket not found: ${req.params.id}`);
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+
+    // Only generate custom ticket for AFTER type
+    if (ticket.tip_bilet !== 'AFTER') {
+      console.log(`❌ Invalid ticket type: ${ticket.tip_bilet}, expected AFTER`);
+      return res.status(400).json({ error: 'Custom ticket generation only available for AFTER tickets' });
+    }
+
+    console.log(`📋 Ticket found: ${ticket.nume} (${ticket.tip_bilet})`);
+
+    // Load the after.png template image
+    const templatePath = path.join(__dirname, 'after.png');
+    console.log(`📁 Loading AFTER template from: ${templatePath}`);
+    const template = await Jimp.read(templatePath);
+    console.log(`✅ AFTER template loaded: ${template.getWidth()}x${template.getHeight()}`);
+    
+    // Calculate QR code size (square from x1042, y238 to x1428, y643)
+    const qrSize = 1428 - 1042; // 386 pixels
+    console.log(`🔲 QR code size: ${qrSize}x${qrSize} pixels`);
+    
+    // Generate QR code as buffer with correct size
+    console.log(`🔗 Generating QR code for: ${ticket.qr_code}`);
+    const qrBuffer = await QRCode.toBuffer(ticket.qr_code, {
+      type: 'png',
+      errorCorrectionLevel: 'H',
+      quality: 0.92,
+      margin: 2,
+      color: {
+        dark: '#000000',
+        light: '#FFFFFF'
+      },
+      width: qrSize // Use calculated size to fit the template box
+    });
+    console.log(`✅ QR code generated: ${qrBuffer.length} bytes`);
+    
+    // Load QR code image
+    const qrImage = await Jimp.read(qrBuffer);
+    console.log(`✅ QR image loaded: ${qrImage.getWidth()}x${qrImage.getHeight()}`);
+    
+    // Load Benzin-BOLD font for name (bolder, more prominent)
+    let font;
+    try {
+      // Try to load Benzin-BOLD font if available
+      console.log(`🔤 Loading Benzin-BOLD font...`);
+      font = await Jimp.loadFont(path.join(__dirname, 'fonts', 'benzin-bold.ttf'));
+      console.log(`✅ Benzin-BOLD font loaded successfully`);
+    } catch (error) {
+      console.log(`⚠️ Benzin-BOLD font not found, using fallback font: ${error.message}`);
+      // Fallback to a bolder built-in font
+      font = await Jimp.loadFont(Jimp.FONT_SANS_64_WHITE);
+      console.log(`✅ Fallback font loaded`);
+    }
+    
+    // Clone template to avoid modifying original
+    const customTicket = template.clone();
+    console.log(`🔄 Template cloned for customization`);
+    
+    // Position for QR code (from after.png template coordinates)
+    const qrX = 1042;  // X position for QR code
+    const qrY = 238;   // Y position for QR code
+    
+    // Position for name (from after.png template coordinates - center in the text box)
+    const nameX = 72;   // X position for name (left edge of text box)
+    const nameY = 324;  // Y position for name (top edge of text box)
+    
+    // Calculate text box dimensions for proper centering
+    const textBoxWidth = 941 - 72;  // 869 pixels wide
+    const textBoxHeight = 579 - 324; // 255 pixels tall
+    
+    console.log(`🎨 Composing AFTER ticket elements...`);
+    console.log(`📍 QR code position: (${qrX}, ${qrY})`);
+    console.log(`📍 Name position: (${nameX}, ${nameY}) in box ${textBoxWidth}x${textBoxHeight}`);
+    console.log(`📝 Name text: "${ticket.nume.toUpperCase()}"`);
+    
+    // Composite QR code onto template
+    customTicket.composite(qrImage, qrX, qrY);
+    console.log(`✅ QR code composited`);
+    
+    // Add name text centered in the text box (uppercase, white, bold)
+    customTicket.print(font, nameX, nameY, {
+      text: ticket.nume.toUpperCase(),
+      alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER,
+      alignmentY: Jimp.VERTICAL_ALIGN_MIDDLE
+    }, textBoxWidth, textBoxHeight);
+    console.log(`✅ Name text rendered`);
+    
+    // Get buffer and send as PNG
+    console.log(`💾 Generating final image buffer...`);
+    const buffer = await customTicket.getBufferAsync(Jimp.MIME_PNG);
+    console.log(`✅ Final image generated: ${buffer.length} bytes`);
+    
+    res.set('Content-Type', 'image/png');
+    res.set('Content-Disposition', `attachment; filename="bilet-after-${ticket.nume}-${ticket._id}.png"`);
+    res.send(buffer);
+    console.log(`🎉 Custom AFTER ticket generated successfully for ${ticket.nume}`);
+    
+  } catch (error) {
+    console.error('❌ Custom AFTER ticket generation error:', error);
+    res.status(500).json({ error: 'Failed to generate custom AFTER ticket' });
   }
 });
 
