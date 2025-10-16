@@ -760,10 +760,10 @@ app.get('/api/tickets/:id/custom-public', async (req, res) => {
       templatePath = path.join(__dirname, 'after.png');
       console.log(`📁 Loading AFTER template from: ${templatePath}`);
       
-      // Calculate QR code size (square from x1042, y238 to x1428, y643)
-      qrSize = 1428 - 1042; // 386 pixels
-      qrX = 1042;  // X position for QR code
-      qrY = 238;   // Y position for QR code
+      // Calculate QR code size (square from x1040, y255 to x1430, y647)
+      qrSize = 1430 - 1040; // 390 pixels
+      qrX = 1040;  // X position for QR code
+      qrY = 255;   // Y position for QR code
       
       // Position for name (from after.png template coordinates)
       nameX = 72;   // X position for name (left edge of text box)
@@ -998,8 +998,8 @@ app.get('/api/tickets/:id/custom-after', authenticateToken, async (req, res) => 
     const template = await Jimp.read(templatePath);
     console.log(`✅ AFTER template loaded: ${template.getWidth()}x${template.getHeight()}`);
     
-    // Calculate QR code size (square from x1042, y238 to x1428, y643)
-    const qrSize = 1428 - 1042; // 386 pixels
+    // Calculate QR code size (square from x1040, y255 to x1430, y647)
+    const qrSize = 1430 - 1040; // 390 pixels
     console.log(`🔲 QR code size: ${qrSize}x${qrSize} pixels`);
     
     // Generate QR code as buffer with correct size
@@ -1040,8 +1040,8 @@ app.get('/api/tickets/:id/custom-after', authenticateToken, async (req, res) => 
     console.log(`🔄 Template cloned for customization`);
     
     // Position for QR code (from after.png template coordinates)
-    const qrX = 1042;  // X position for QR code
-    const qrY = 238;   // Y position for QR code
+    const qrX = 1040;  // X position for QR code
+    const qrY = 255;   // Y position for QR code
     
     // Position for name (from after.png template coordinates - center in the text box)
     const nameX = 72;   // X position for name (left edge of text box)
