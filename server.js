@@ -773,8 +773,8 @@ app.get('/api/tickets/:id/custom-public', async (req, res) => {
       textBoxWidth = 941 - 72;  // 869 pixels wide
       textBoxHeight = 579 - 324; // 255 pixels tall
     } else if (ticket.tip_bilet === 'BAL + AFTER VIP') {
-      // Use BAL + AFTER VIP.png template for BAL + AFTER VIP tickets
-      templatePath = path.join(__dirname, 'BAL + AFTER VIP.png');
+      // Use BAL+AFTERVIP.png template for BAL + AFTER VIP tickets
+      templatePath = path.join(__dirname, 'BAL+AFTERVIP.png');
       console.log(`📁 Loading BAL + AFTER VIP template from: ${templatePath}`);
       
       // Calculate QR code size (square from x1035, y252 to x1425, y642)
@@ -790,8 +790,8 @@ app.get('/api/tickets/:id/custom-public', async (req, res) => {
       textBoxWidth = 930 - 72;  // 858 pixels wide
       textBoxHeight = 580 - 318; // 262 pixels tall
     } else if (ticket.tip_bilet === 'AFTER VIP') {
-      // Use AFTER VIP.png template for AFTER VIP tickets
-      templatePath = path.join(__dirname, 'AFTER VIP.png');
+      // Use AFTERVIP.png template for AFTER VIP tickets
+      templatePath = path.join(__dirname, 'AFTERVIP.png');
       console.log(`📁 Loading AFTER VIP template from: ${templatePath}`);
       
       // Calculate QR code size (square from x1035, y252 to x1425, y642)
