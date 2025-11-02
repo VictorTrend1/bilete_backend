@@ -772,6 +772,40 @@ app.get('/api/tickets/:id/custom-public', async (req, res) => {
       // Calculate text box dimensions for proper centering
       textBoxWidth = 941 - 72;  // 869 pixels wide
       textBoxHeight = 579 - 324; // 255 pixels tall
+    } else if (ticket.tip_bilet === 'BAL + AFTER VIP') {
+      // Use BAL + AFTER VIP.png template for BAL + AFTER VIP tickets
+      templatePath = path.join(__dirname, 'BAL + AFTER VIP.png');
+      console.log(`📁 Loading BAL + AFTER VIP template from: ${templatePath}`);
+      
+      // Calculate QR code size (square from x1035, y252 to x1425, y642)
+      qrSize = 1425 - 1035; // 390 pixels
+      qrX = 1035;  // X position for QR code
+      qrY = 252;   // Y position for QR code
+      
+      // Position for name (from BAL + AFTER VIP.png template coordinates)
+      nameX = 72;   // X position for name (left edge of text box)
+      nameY = 318;  // Y position for name (top edge of text box)
+      
+      // Calculate text box dimensions for proper centering
+      textBoxWidth = 930 - 72;  // 858 pixels wide
+      textBoxHeight = 580 - 318; // 262 pixels tall
+    } else if (ticket.tip_bilet === 'AFTER VIP') {
+      // Use AFTER VIP.png template for AFTER VIP tickets
+      templatePath = path.join(__dirname, 'AFTER VIP.png');
+      console.log(`📁 Loading AFTER VIP template from: ${templatePath}`);
+      
+      // Calculate QR code size (square from x1035, y252 to x1425, y642)
+      qrSize = 1425 - 1035; // 390 pixels
+      qrX = 1035;  // X position for QR code
+      qrY = 252;   // Y position for QR code
+      
+      // Position for name (from AFTER VIP.png template coordinates)
+      nameX = 72;   // X position for name (left edge of text box)
+      nameY = 318;  // Y position for name (top edge of text box)
+      
+      // Calculate text box dimensions for proper centering
+      textBoxWidth = 930 - 72;  // 858 pixels wide
+      textBoxHeight = 580 - 318; // 262 pixels tall
     } else {
       // Use model_bilet.jpg template for other ticket types
       templatePath = path.join(__dirname, 'model_bilet.jpg');
