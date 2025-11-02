@@ -806,10 +806,27 @@ app.get('/api/tickets/:id/custom-public', async (req, res) => {
       // Calculate text box dimensions for proper centering
       textBoxWidth = 930 - 72;  // 858 pixels wide
       textBoxHeight = 580 - 318; // 262 pixels tall
-    } else {
-      // Use model_bilet.jpg template for other ticket types
+    } else if (ticket.tip_bilet === 'BAL') {
+      // Use model_bilet.jpg template for BAL tickets
       templatePath = path.join(__dirname, 'model_bilet.jpg');
       console.log(`📁 Loading BAL template from: ${templatePath}`);
+      
+      // Calculate QR code size (square from 1049,270 to 1424,638)
+      qrSize = 1424 - 1049; // 375 pixels
+      qrX = 1049;  // X position for QR code
+      qrY = 270;   // Y position for QR code
+      
+      // Position for name (from template coordinates - center in the text box)
+      nameX = 84;   // X position for name (left edge of text box)
+      nameY = 334;  // Y position for name (top edge of text box)
+      
+      // Calculate text box dimensions for proper centering
+      textBoxWidth = 928 - 84;  // 844 pixels wide
+      textBoxHeight = 566 - 334; // 232 pixels tall
+    } else {
+      // Use model_bilet.jpg template for other ticket types (e.g., BAL + AFTER)
+      templatePath = path.join(__dirname, 'model_bilet.jpg');
+      console.log(`📁 Loading default template from: ${templatePath}`);
       
       // Calculate QR code size (square from 1049,270 to 1424,638)
       qrSize = 1424 - 1049; // 375 pixels
