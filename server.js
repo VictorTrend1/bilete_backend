@@ -822,8 +822,8 @@ app.get('/api/tickets/:id/custom-public', async (req, res) => {
       // Calculate text box dimensions for proper centering
       textBoxWidth = 928 - 84;  // 844 pixels wide
       textBoxHeight = 566 - 334; // 232 pixels tall
-    } else if(ticket.tip_bilet === 'BAL + AFTER') {
-      // Use BAL+AFTER.png template for BAL + AFTER tickets
+    } else if (ticket.tip_bilet === 'BAL + AFTER') {
+      // Use BILET_AFTERbal.png template for BAL + AFTER tickets
       templatePath = path.join(__dirname, 'BILET_AFTERbal.png');
       console.log(`📁 Loading BAL + AFTER template from: ${templatePath}`);
       
@@ -831,6 +831,14 @@ app.get('/api/tickets/:id/custom-public', async (req, res) => {
       qrSize = 1425 - 1035; // 390 pixels
       qrX = 1035;  // X position for QR code
       qrY = 252;   // Y position for QR code
+      
+      // Position for name (from BILET_AFTERbal.png template coordinates)
+      nameX = 72;   // X position for name (left edge of text box)
+      nameY = 318;  // Y position for name (top edge of text box)
+      
+      // Calculate text box dimensions for proper centering
+      textBoxWidth = 930 - 72;  // 858 pixels wide
+      textBoxHeight = 580 - 318; // 262 pixels tall
     }
     
     const template = await Jimp.read(templatePath);
