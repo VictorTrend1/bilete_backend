@@ -829,8 +829,8 @@ app.get('/api/tickets/:id/custom-public', async (req, res) => {
       
       // Calculate QR code size (square from x1035, y252 to x1425, y642)
       qrSize = 1425 - 1035; // 390 pixels
-      qrX = 1035;  // X position for QR code
-      qrY = 266;   // Y position for QR code
+      qrX = 1055;  // X position for QR code
+      qrY = 252;   // Y position for QR code
       
       // Position for name (from BILET_AFTERbal.png template coordinates)
       nameX = 72;   // X position for name (left edge of text box)
