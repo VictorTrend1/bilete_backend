@@ -1216,7 +1216,11 @@ app.post('/api/verify-ticket', async (req, res) => {
     });
 
     // Check if ticket has been verified multiple times (fraud detection)
-    if (ticket.verification_count >= 2) {
+    // For BAL + AFTER and BAL + AFTER VIP tickets, allow 2 successful reads before flagging (flag on 3rd)
+    // For all other tickets, allow 1 successful read before flagging (flag on 2nd)
+    const isDualAccessTicket = (ticket.tip_bilet === 'BAL + AFTER' || ticket.tip_bilet === 'BAL + AFTER VIP');
+    const flagThreshold = isDualAccessTicket ? 3 : 2;
+    if (ticket.verification_count >= flagThreshold) {
       ticket.flagged = true;
       ticket.verified = true;
       await ticket.save();
