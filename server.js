@@ -764,7 +764,6 @@ app.get('/api/tickets/:id/custom-public', async (req, res) => {
       qrSize = 1430 - 1040; // 390 pixels
       qrX = 1040;  // X position for QR code
       qrY = 255;   // Y position for QR code
-      
       // Position for name (from after.png template coordinates)
       nameX = 72;   // X position for name (left edge of text box)
       nameY = 324;  // Y position for name (top edge of text box)
@@ -823,23 +822,15 @@ app.get('/api/tickets/:id/custom-public', async (req, res) => {
       // Calculate text box dimensions for proper centering
       textBoxWidth = 928 - 84;  // 844 pixels wide
       textBoxHeight = 566 - 334; // 232 pixels tall
-    } else {
-      // Use model_bilet.jpg template for other ticket types (e.g., BAL + AFTER)
-      templatePath = path.join(__dirname, 'model_bilet.jpg');
-      console.log(`📁 Loading default template from: ${templatePath}`);
+    } else if(ticket.tip_bilet === 'BAL + AFTER') {
+      // Use BAL+AFTER.png template for BAL + AFTER tickets
+      templatePath = path.join(__dirname, 'BILET_AFTERbal.png');
+      console.log(`📁 Loading BAL + AFTER template from: ${templatePath}`);
       
-      // Calculate QR code size (square from 1049,270 to 1424,638)
-      qrSize = 1424 - 1049; // 375 pixels
-      qrX = 1049;  // X position for QR code
-      qrY = 270;   // Y position for QR code
-      
-      // Position for name (from template coordinates - center in the text box)
-      nameX = 84;   // X position for name (left edge of text box)
-      nameY = 334;  // Y position for name (top edge of text box)
-      
-      // Calculate text box dimensions for proper centering
-      textBoxWidth = 928 - 84;  // 844 pixels wide
-      textBoxHeight = 566 - 334; // 232 pixels tall
+      // Calculate QR code size (square from x1035, y252 to x1425, y642)
+      qrSize = 1425 - 1035; // 390 pixels
+      qrX = 1035;  // X position for QR code
+      qrY = 252;   // Y position for QR code
     }
     
     const template = await Jimp.read(templatePath);
