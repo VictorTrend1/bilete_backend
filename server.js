@@ -806,22 +806,42 @@ app.get('/api/tickets/:id/custom-public', async (req, res) => {
       textBoxWidth = 930 - 72;  // 858 pixels wide
       textBoxHeight = 580 - 318; // 262 pixels tall
     } else if (ticket.tip_bilet === 'BAL') {
-      // Use model_bilet.jpg template for BAL tickets
-      templatePath = path.join(__dirname, 'model_bilet.jpg');
-      console.log(`📁 Loading BAL template from: ${templatePath}`);
-      
-      // Calculate QR code size (square from 1049,270 to 1424,638)
-      qrSize = 1424 - 1049; // 375 pixels
-      qrX = 1049;  // X position for QR code
-      qrY = 270;   // Y position for QR code
-      
-      // Position for name (from template coordinates - center in the text box)
-      nameX = 84;   // X position for name (left edge of text box)
-      nameY = 334;  // Y position for name (top edge of text box)
-      
-      // Calculate text box dimensions for proper centering
-      textBoxWidth = 928 - 84;  // 844 pixels wide
-      textBoxHeight = 566 - 334; // 232 pixels tall
+      // Check if this is for Bal Carabella group
+      if (ticket.group === 'Bal Carabella') {
+        // Use bal_carabella.png template for Bal Carabella BAL tickets
+        templatePath = path.join(__dirname, 'bal_carabella.png');
+        console.log(`📁 Loading Bal Carabella BAL template from: ${templatePath}`);
+        
+        // Calculate QR code size (square from 102,316 to 525,741)
+        qrSize = 525 - 102; // 423 pixels
+        qrX = 102;  // X position for QR code
+        qrY = 316;   // Y position for QR code
+        
+        // Position for name (from template coordinates - center in the text box)
+        nameX = 801;   // X position for name (left edge of text box)
+        nameY = 409;  // Y position for name (top edge of text box)
+        
+        // Calculate text box dimensions for proper centering
+        textBoxWidth = 1278 - 801;  // 477 pixels wide
+        textBoxHeight = 660 - 409; // 251 pixels tall
+      } else {
+        // Use model_bilet.jpg template for other BAL tickets
+        templatePath = path.join(__dirname, 'model_bilet.jpg');
+        console.log(`📁 Loading BAL template from: ${templatePath}`);
+        
+        // Calculate QR code size (square from 1049,270 to 1424,638)
+        qrSize = 1424 - 1049; // 375 pixels
+        qrX = 1049;  // X position for QR code
+        qrY = 270;   // Y position for QR code
+        
+        // Position for name (from template coordinates - center in the text box)
+        nameX = 84;   // X position for name (left edge of text box)
+        nameY = 334;  // Y position for name (top edge of text box)
+        
+        // Calculate text box dimensions for proper centering
+        textBoxWidth = 928 - 84;  // 844 pixels wide
+        textBoxHeight = 566 - 334; // 232 pixels tall
+      }
     } else if (ticket.tip_bilet === 'BAL + AFTER') {
       // Use BILET_AFTERbal.png template for BAL + AFTER tickets
       templatePath = path.join(__dirname, 'BILET_AFTERbal.png');
@@ -951,12 +971,45 @@ app.get('/api/tickets/:id/custom-bal', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Custom ticket generation only available for BAL tickets' });
     }
 
-    // Load the template image
-    const templatePath = path.join(__dirname, 'model_bilet.jpg');
+    // Load the template image - use bal_carabella.png for Bal Carabella group
+    let templatePath;
+    if (ticket.group === 'Bal Carabella') {
+      templatePath = path.join(__dirname, 'bal_carabella.png');
+      console.log(`📁 Loading Bal Carabella BAL template from: ${templatePath}`);
+    } else {
+      templatePath = path.join(__dirname, 'model_bilet.jpg');
+      console.log(`📁 Loading BAL template from: ${templatePath}`);
+    }
     const template = await Jimp.read(templatePath);
     
-    // Calculate QR code size (square from 1049,270 to 1424,638)
-    const qrSize = 1424 - 1049; // 375 pixels
+    // Calculate QR code size and positions based on group
+    let qrSize, qrX, qrY, nameX, nameY, textBoxWidth, textBoxHeight;
+    
+    if (ticket.group === 'Bal Carabella') {
+      // Bal Carabella template coordinates
+      // QR code: between (102, 316) and (525, 741)
+      qrSize = 525 - 102; // 423 pixels
+      qrX = 102;  // X position for QR code
+      qrY = 316;   // Y position for QR code
+      
+      // Name: between (801, 409) and (1278, 660)
+      nameX = 801;   // X position for name (left edge of text box)
+      nameY = 409;  // Y position for name (top edge of text box)
+      textBoxWidth = 1278 - 801;  // 477 pixels wide
+      textBoxHeight = 660 - 409; // 251 pixels tall
+    } else {
+      // Default BAL template coordinates (model_bilet.jpg)
+      // QR code: square from 1049,270 to 1424,638
+      qrSize = 1424 - 1049; // 375 pixels
+      qrX = 1049;  // X position for QR code
+      qrY = 270;   // Y position for QR code
+      
+      // Name: from template coordinates
+      nameX = 84;   // X position for name (left edge of text box)
+      nameY = 334;  // Y position for name (top edge of text box)
+      textBoxWidth = 928 - 84;  // 844 pixels wide
+      textBoxHeight = 566 - 334; // 232 pixels tall
+    }
     
     // Generate QR code as buffer with correct size
     const qrBuffer = await QRCode.toBuffer(ticket.qr_code, {
@@ -987,18 +1040,6 @@ app.get('/api/tickets/:id/custom-bal', authenticateToken, async (req, res) => {
     
     // Clone template to avoid modifying original
     const customTicket = template.clone();
-    
-    // Position for QR code (from template coordinates)
-    const qrX = 1049;  // X position for QR code
-    const qrY = 270;   // Y position for QR code
-    
-    // Position for name (from template coordinates - center in the text box)
-    const nameX = 84;   // X position for name (left edge of text box)
-    const nameY = 334;  // Y position for name (top edge of text box)
-    
-    // Calculate text box dimensions for proper centering
-    const textBoxWidth = 928 - 84;  // 844 pixels wide
-    const textBoxHeight = 566 - 334; // 232 pixels tall
     
     // Composite QR code onto template
     customTicket.composite(qrImage, qrX, qrY);
