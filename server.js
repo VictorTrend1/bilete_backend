@@ -91,7 +91,8 @@ const ticketSchema = new mongoose.Schema({
 // Group mapping for referral codes (SECRET - only known by organizers)
 const GROUP_CODES = {
   'BAL2025ECON': 'Bal Economic',
-  'BAL2025CARA': 'Bal Carabella'
+  'BAL2025CARA': 'Bal Carabella',
+  'BAL_ADMIN_TEST': 'Administrator'
 };
 
 const User = mongoose.model('User', userSchema);
