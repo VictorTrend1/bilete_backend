@@ -1591,7 +1591,25 @@ app.post('/api/verify-ticket-by-phone', async (req, res) => {
       return res.status(404).json({ error: 'Nu s-a găsit niciun bilet pentru acest număr de telefon' });
     }
 
-    // If multiple tickets found, use the most recent one
+    // If multiple tickets found, return them for user selection
+    if (tickets.length > 1) {
+      return res.json({
+        multiple: true,
+        count: tickets.length,
+        tickets: tickets.map(t => ({
+          id: t._id,
+          nume: t.nume,
+          telefon: t.telefon,
+          tip_bilet: t.tip_bilet,
+          verified: t.verified,
+          verification_count: t.verification_count,
+          created_at: t.created_at,
+          group: t.group
+        }))
+      });
+    }
+
+    // Single ticket found - verify it directly
     const ticket = tickets[0];
     
     // Increment verification count
@@ -1651,6 +1669,80 @@ app.post('/api/verify-ticket-by-phone', async (req, res) => {
   } catch (error) {
     console.error('Ticket verification by phone error:', error);
     res.status(500).json({ error: 'Error verifying ticket by phone number' });
+  }
+});
+
+// Verify a specific ticket by ID (for when multiple tickets are found)
+app.post('/api/verify-ticket-by-id/:id', async (req, res) => {
+  const ticketId = req.params.id;
+
+  if (!ticketId) {
+    return res.status(400).json({ error: 'Ticket ID is required' });
+  }
+
+  try {
+    const ticket = await Ticket.findById(ticketId);
+    
+    if (!ticket) {
+      return res.status(404).json({ error: 'Nu s-a găsit biletul' });
+    }
+
+    // Increment verification count
+    ticket.verification_count += 1;
+    
+    // Add to verification history
+    ticket.verification_history.push({
+      timestamp: new Date(),
+      verified: true
+    });
+
+    // Check if ticket has been verified multiple times (fraud detection)
+    const isDualAccessTicket = (ticket.tip_bilet === 'BAL + AFTER' || ticket.tip_bilet === 'BAL + AFTER VIP');
+    const flagThreshold = isDualAccessTicket ? 3 : 2;
+    
+    if (ticket.verification_count >= flagThreshold) {
+      ticket.flagged = true;
+      ticket.verified = true;
+      await ticket.save();
+      
+      return res.json({
+        message: 'Ticket verified successfully',
+        warning: '⚠️ ATENȚIE: Acest bilet a fost deja validat anterior!',
+        flagged: true,
+        verification_count: ticket.verification_count,
+        ticket: {
+          id: ticket._id,
+          nume: ticket.nume,
+          telefon: ticket.telefon,
+          tip_bilet: ticket.tip_bilet,
+          verified: ticket.verified,
+          verification_count: ticket.verification_count,
+          flagged: ticket.flagged,
+          first_verified: ticket.verification_history[0]?.timestamp,
+          created_at: ticket.created_at
+        }
+      });
+    }
+
+    // Mark as verified for first time
+    ticket.verified = true;
+    await ticket.save();
+
+    res.json({
+      message: 'Ticket verified successfully',
+      ticket: {
+        id: ticket._id,
+        nume: ticket.nume,
+        telefon: ticket.telefon,
+        tip_bilet: ticket.tip_bilet,
+        verified: ticket.verified,
+        verification_count: ticket.verification_count,
+        created_at: ticket.created_at
+      }
+    });
+  } catch (error) {
+    console.error('Ticket verification by ID error:', error);
+    res.status(500).json({ error: 'Error verifying ticket' });
   }
 });
 
