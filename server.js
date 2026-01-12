@@ -1432,6 +1432,8 @@ app.put('/api/tickets/:id/sent', authenticateToken, async (req, res) => {
 
 // Helper function to normalize phone number for searching
 function normalizePhoneForSearch(phoneNumber) {
+  if (!phoneNumber) return '';
+  
   // Remove all non-digit characters except +
   let cleaned = phoneNumber.replace(/[^\d+]/g, '');
   
@@ -1452,6 +1454,14 @@ function normalizePhoneForSearch(phoneNumber) {
   
   // Return original if can't normalize
   return phoneNumber;
+}
+
+// Helper function to extract just the digits (last 9 digits for Romanian numbers)
+function extractPhoneDigits(phoneNumber) {
+  if (!phoneNumber) return '';
+  // Remove all non-digit characters and get last 9 digits
+  const digits = phoneNumber.replace(/\D/g, '');
+  return digits.slice(-9); // Get last 9 digits (Romanian mobile number)
 }
 
 // Verify ticket (for organizers)
@@ -1541,26 +1551,41 @@ app.post('/api/verify-ticket-by-phone', async (req, res) => {
   try {
     // Normalize the input phone number
     const normalizedPhone = normalizePhoneForSearch(phoneNumber);
+    console.log('Normalized phone for search:', normalizedPhone);
     
-    // Search for tickets with matching phone number
-    // Try multiple formats to handle different storage formats
-    const searchPatterns = [
-      normalizedPhone,
-      normalizedPhone.replace('+', ''),
-      normalizedPhone.replace('+40', '0'),
-      normalizedPhone.replace('+40', '')
+    // Extract the core digits (last 9 digits for Romanian numbers)
+    const phoneDigits = extractPhoneDigits(phoneNumber);
+    console.log('Phone digits extracted:', phoneDigits);
+    
+    // Generate all possible formats for searching
+    const searchFormats = [
+      normalizedPhone,                                    // +40712345678
+      normalizedPhone.replace('+', ''),                   // 40712345678
+      normalizedPhone.replace('+40', '0'),                 // 0712345678
+      normalizedPhone.replace('+40', ''),                  // 712345678
+      phoneDigits,                                         // 712345678 (last 9 digits)
+      '0' + phoneDigits,                                   // 0712345678
+      '40' + phoneDigits,                                  // 40712345678
+      '+40' + phoneDigits                                  // +40712345678
     ];
+    
+    // Remove duplicates and empty strings
+    const uniqueFormats = [...new Set(searchFormats.filter(f => f && f.length > 0))];
+    console.log('Search formats:', uniqueFormats);
     
     // Find tickets matching any of the patterns
     const tickets = await Ticket.find({
-      $or: [
-        { telefon: normalizedPhone },
-        { telefon: normalizedPhone.replace('+', '') },
-        { telefon: normalizedPhone.replace('+40', '0') },
-        { telefon: normalizedPhone.replace('+40', '') },
-        { telefon: { $regex: new RegExp(normalizedPhone.replace(/[^\d]/g, '').slice(-9), 'i') } }
-      ]
+      $or: uniqueFormats.map(format => ({ telefon: format }))
+        .concat([
+          // Also try regex search on the last 9 digits
+          { telefon: { $regex: new RegExp(phoneDigits + '$', 'i') } },
+          { telefon: { $regex: new RegExp('0' + phoneDigits + '$', 'i') } },
+          { telefon: { $regex: new RegExp('40' + phoneDigits + '$', 'i') } },
+          { telefon: { $regex: new RegExp('\\+40' + phoneDigits + '$', 'i') } }
+        ])
     }).sort({ created_at: -1 }); // Get most recent first
+    
+    console.log(`Found ${tickets.length} tickets matching phone number`);
     
     if (!tickets || tickets.length === 0) {
       return res.status(404).json({ error: 'Nu s-a găsit niciun bilet pentru acest număr de telefon' });
