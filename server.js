@@ -1429,6 +1429,30 @@ app.put('/api/tickets/:id/sent', authenticateToken, async (req, res) => {
   }
 });
 
+// Helper function to normalize phone number for searching
+function normalizePhoneForSearch(phoneNumber) {
+  // Remove all non-digit characters except +
+  let cleaned = phoneNumber.replace(/[^\d+]/g, '');
+  
+  // Handle different formats
+  if (cleaned.startsWith('+40')) {
+    // Format: +40712345678 -> keep as is
+    return cleaned;
+  } else if (cleaned.startsWith('40') && cleaned.length === 11) {
+    // Format: 40712345678 -> convert to +40712345678
+    return '+' + cleaned;
+  } else if (cleaned.startsWith('0') && cleaned.length === 10) {
+    // Format: 0712345678 -> convert to +40712345678
+    return '+40' + cleaned.substring(1);
+  } else if (cleaned.length === 9) {
+    // Format: 712345678 -> convert to +40712345678
+    return '+40' + cleaned;
+  }
+  
+  // Return original if can't normalize
+  return phoneNumber;
+}
+
 // Verify ticket (for organizers)
 app.post('/api/verify-ticket', async (req, res) => {
   const { qrData } = req.body;
@@ -1502,6 +1526,105 @@ app.post('/api/verify-ticket', async (req, res) => {
   } catch (error) {
     console.error('Ticket verification error:', error);
     res.status(400).json({ error: 'Invalid QR code data' });
+  }
+});
+
+// Verify ticket by phone number (for organizers)
+app.post('/api/verify-ticket-by-phone', async (req, res) => {
+  const { phoneNumber } = req.body;
+
+  if (!phoneNumber) {
+    return res.status(400).json({ error: 'Phone number is required' });
+  }
+
+  try {
+    // Normalize the input phone number
+    const normalizedPhone = normalizePhoneForSearch(phoneNumber);
+    
+    // Search for tickets with matching phone number
+    // Try multiple formats to handle different storage formats
+    const searchPatterns = [
+      normalizedPhone,
+      normalizedPhone.replace('+', ''),
+      normalizedPhone.replace('+40', '0'),
+      normalizedPhone.replace('+40', '')
+    ];
+    
+    // Find tickets matching any of the patterns
+    const tickets = await Ticket.find({
+      $or: [
+        { telefon: normalizedPhone },
+        { telefon: normalizedPhone.replace('+', '') },
+        { telefon: normalizedPhone.replace('+40', '0') },
+        { telefon: normalizedPhone.replace('+40', '') },
+        { telefon: { $regex: new RegExp(normalizedPhone.replace(/[^\d]/g, '').slice(-9), 'i') } }
+      ]
+    }).sort({ created_at: -1 }); // Get most recent first
+    
+    if (!tickets || tickets.length === 0) {
+      return res.status(404).json({ error: 'Nu s-a găsit niciun bilet pentru acest număr de telefon' });
+    }
+
+    // If multiple tickets found, use the most recent one
+    const ticket = tickets[0];
+    
+    // Increment verification count
+    ticket.verification_count += 1;
+    
+    // Add to verification history
+    ticket.verification_history.push({
+      timestamp: new Date(),
+      verified: true
+    });
+
+    // Check if ticket has been verified multiple times (fraud detection)
+    // For BAL + AFTER and BAL + AFTER VIP tickets, allow 2 successful reads before flagging (flag on 3rd)
+    // For all other tickets, allow 1 successful read before flagging (flag on 2nd)
+    const isDualAccessTicket = (ticket.tip_bilet === 'BAL + AFTER' || ticket.tip_bilet === 'BAL + AFTER VIP');
+    const flagThreshold = isDualAccessTicket ? 3 : 2;
+    if (ticket.verification_count >= flagThreshold) {
+      ticket.flagged = true;
+      ticket.verified = true;
+      await ticket.save();
+      
+      return res.json({
+        message: 'Ticket verified successfully',
+        warning: '⚠️ ATENȚIE: Acest bilet a fost deja validat anterior!',
+        flagged: true,
+        verification_count: ticket.verification_count,
+        ticket: {
+          id: ticket._id,
+          nume: ticket.nume,
+          telefon: ticket.telefon,
+          tip_bilet: ticket.tip_bilet,
+          verified: ticket.verified,
+          verification_count: ticket.verification_count,
+          flagged: ticket.flagged,
+          first_verified: ticket.verification_history[0]?.timestamp,
+          created_at: ticket.created_at
+        }
+      });
+    }
+
+    // Mark as verified for first time
+    ticket.verified = true;
+    await ticket.save();
+
+    res.json({
+      message: 'Ticket verified successfully',
+      ticket: {
+        id: ticket._id,
+        nume: ticket.nume,
+        telefon: ticket.telefon,
+        tip_bilet: ticket.tip_bilet,
+        verified: ticket.verified,
+        verification_count: ticket.verification_count,
+        created_at: ticket.created_at
+      }
+    });
+  } catch (error) {
+    console.error('Ticket verification by phone error:', error);
+    res.status(500).json({ error: 'Error verifying ticket by phone number' });
   }
 });
 
