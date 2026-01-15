@@ -1771,6 +1771,49 @@ app.get('/api/admin/tickets', authenticateToken, async (req, res) => {
   }
 });
 
+// Get tickets logs by group (for Administrator users only)
+app.get('/api/admin/tickets-logs/:group', authenticateToken, async (req, res) => {
+  try {
+    // Check if user is Administrator
+    if (req.user.group !== 'Administrator') {
+      return res.status(403).json({ error: 'Access denied. Administrator access required.' });
+    }
+
+    const { group } = req.params;
+    
+    // Get all tickets for the specified group with creator info
+    const tickets = await Ticket.find({ group: group })
+      .sort({ created_at: -1 })
+      .populate('user_id', 'username')
+      .lean();
+
+    // Format tickets with creator information
+    const formattedTickets = tickets.map(ticket => ({
+      id: ticket._id,
+      nume: ticket.nume,
+      telefon: ticket.telefon,
+      tip_bilet: ticket.tip_bilet,
+      group: ticket.group,
+      verified: ticket.verified,
+      verification_count: ticket.verification_count,
+      sent: ticket.sent,
+      created_at: ticket.created_at,
+      creator_username: ticket.user_id ? ticket.user_id.username : 'Unknown',
+      creator_id: ticket.user_id ? ticket.user_id._id : null
+    }));
+
+    res.json({
+      success: true,
+      group: group,
+      tickets: formattedTickets,
+      count: formattedTickets.length
+    });
+  } catch (error) {
+    console.error('Error fetching ticket logs:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 // Get tickets with filtering by sent status
 app.get('/api/tickets/filtered', authenticateToken, async (req, res) => {
   try {
