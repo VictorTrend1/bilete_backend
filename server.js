@@ -92,7 +92,8 @@ const ticketSchema = new mongoose.Schema({
 const GROUP_CODES = {
   'BAL2025ECON': 'Bal Economic',
   'BAL2025CARA': 'Bal Carabella',
-  'BAL_ADMIN_TEST': 'Administrator'
+  'BAL_ADMIN_TEST': 'Administrator',
+  'Bal10-11' : 'Bal10-11'
 };
 
 const User = mongoose.model('User', userSchema);
