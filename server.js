@@ -93,7 +93,7 @@ const GROUP_CODES = {
   'BAL2025ECON': 'Bal Economic',
   'BAL2025CARA': 'Bal Carabella',
   'BAL_ADMIN_TEST': 'Administrator',
-  'Bal10-11' : 'Bal10-11'
+  'Bal10-11' : 'Balul Tineretului'
 };
 
 const User = mongoose.model('User', userSchema);
@@ -795,8 +795,24 @@ async function generateCustomTicket(ticket) {
     textBoxWidth = 930 - 72;  // 858 pixels wide
     textBoxHeight = 580 - 318; // 262 pixels tall
   } else if (ticket.tip_bilet === 'BAL') {
-    // Check if this is for Bal Carabella group
-    if (ticket.group === 'Bal Carabella') {
+    if(ticket.group === 'Bal10-11') {
+      // Use bal_tineret.jpeg template for Bal10-11 group
+      templatePath = path.join(__dirname, 'bal_tineret.jpeg');
+      console.log(`📁 Loading Bal10-11 template from: ${templatePath}`);
+      
+      // QR code position: from (572, 237) to (786, 451) - square
+      qrSize = 786 - 572; // 214 pixels
+      qrX = 572;  // X position for QR code
+      qrY = 237;   // Y position for QR code
+      
+      // Text position: between (44, 270) and (525, 417)
+      nameX = 44;   // X position for name (left edge of text box)
+      nameY = 270;  // Y position for name (top edge of text box)
+      
+      // Calculate text box dimensions for proper centering
+      textBoxWidth = 525 - 44;  // 481 pixels wide
+      textBoxHeight = 417 - 270; // 147 pixels tall
+    } else if (ticket.group === 'Bal Carabella') {
       // Use bal_carabella.png template for Bal Carabella BAL tickets
       templatePath = path.join(__dirname, 'bal_carabella.png');
       console.log(`📁 Loading Bal Carabella BAL template from: ${templatePath}`);
