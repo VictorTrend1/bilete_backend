@@ -810,7 +810,7 @@ async function generateCustomTicket(ticket) {
       nameY = 285;  // Y position for name (top edge of text box)
       
       // Calculate text box dimensions for proper centering
-      textBoxWidth = 512 - 61;  // 451 pixels wide
+      textBoxWidth = 512 - 91;  // 451 pixels wide
       textBoxHeight = 405 - 285; // 120 pixels tall
     } else if (ticket.group === 'Bal Carabella') {
       // Use bal_carabella.png template for Bal Carabella BAL tickets
