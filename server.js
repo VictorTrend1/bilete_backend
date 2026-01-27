@@ -1447,6 +1447,56 @@ app.put('/api/tickets/:id/sent', authenticateToken, async (req, res) => {
   }
 });
 
+// Update ticket type (tip_bilet)
+app.put('/api/tickets/:id/type', authenticateToken, async (req, res) => {
+  try {
+    const { tip_bilet } = req.body;
+    
+    if (!tip_bilet) {
+      return res.status(400).json({ error: 'Tip bilet is required' });
+    }
+    
+    const validTicketTypes = ['BAL + AFTER', 'BAL', 'AFTER', 'AFTER VIP', 'BAL + AFTER VIP'];
+    if (!validTicketTypes.includes(tip_bilet)) {
+      return res.status(400).json({ error: 'Invalid ticket type' });
+    }
+    
+    const ticket = await Ticket.findOne({ _id: req.params.id, group: req.user.group });
+    
+    if (!ticket) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+    
+    // Update ticket type
+    ticket.tip_bilet = tip_bilet;
+    
+    // Regenerate QR code with new ticket type
+    const qrData = JSON.stringify({
+      userId: ticket.user_id,
+      group: ticket.group,
+      nume: ticket.nume,
+      telefon: ticket.telefon,
+      tip_bilet: tip_bilet,
+      timestamp: Date.now()
+    });
+    
+    ticket.qr_code = qrData;
+    await ticket.save();
+    
+    res.json({
+      success: true,
+      message: 'Ticket type updated successfully',
+      ticket: {
+        id: ticket._id,
+        tip_bilet: ticket.tip_bilet
+      }
+    });
+  } catch (error) {
+    console.error('Error updating ticket type:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 // Helper function to normalize phone number for searching
 function normalizePhoneForSearch(phoneNumber) {
   if (!phoneNumber) return '';
