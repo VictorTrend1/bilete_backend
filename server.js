@@ -805,13 +805,13 @@ async function generateCustomTicket(ticket) {
       qrX = 572;  // X position for QR code
       qrY = 237;   // Y position for QR code
       
-      // Text position: between (63, 287) and (508, 403)
-      nameX = 63;   // X position for name (left edge of text box)
-      nameY = 287;  // Y position for name (top edge of text box)
+      // Text position: between (61, 285) and (512, 405)
+      nameX = 61;   // X position for name (left edge of text box)
+      nameY = 285;  // Y position for name (top edge of text box)
       
       // Calculate text box dimensions for proper centering
-      textBoxWidth = 508 - 63;  // 445 pixels wide
-      textBoxHeight = 403 - 287; // 116 pixels tall
+      textBoxWidth = 512 - 91;  // 451 pixels wide
+      textBoxHeight = 405 - 285; // 120 pixels tall
     } else if (ticket.group === 'Bal Carabella') {
       // Use bal_carabella.png template for Bal Carabella BAL tickets
       templatePath = path.join(__dirname, 'bal_carabella.png');
