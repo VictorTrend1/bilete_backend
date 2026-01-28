@@ -740,7 +740,7 @@ app.get('/api/tickets/:id/public', async (req, res) => {
 });
 
 // Helper function to generate custom ticket image
-async function generateCustomTicket(ticket) {
+async function generateCustomTicket(ticket, isPreview = false) {
   // Load the appropriate template image based on ticket type
   let templatePath, qrSize, qrX, qrY, nameX, nameY, textBoxWidth, textBoxHeight;
   
@@ -867,11 +867,8 @@ async function generateCustomTicket(ticket) {
   }
   
   const template = await Jimp.read(templatePath);
-  console.log(`✅ Template loaded: ${template.getWidth()}x${template.getHeight()}`);
-  console.log(`🔲 QR code size: ${qrSize}x${qrSize} pixels`);
   
   // Generate QR code as buffer with correct size
-  console.log(`🔗 Generating QR code for: ${ticket.qr_code}`);
   const qrBuffer = await QRCode.toBuffer(ticket.qr_code, {
     type: 'png',
     errorCorrectionLevel: 'H',
@@ -883,38 +880,25 @@ async function generateCustomTicket(ticket) {
     },
     width: qrSize // Use calculated size to fit the template box
   });
-  console.log(`✅ QR code generated: ${qrBuffer.length} bytes`);
   
   // Load QR code image
   const qrImage = await Jimp.read(qrBuffer);
-  console.log(`✅ QR image loaded: ${qrImage.getWidth()}x${qrImage.getHeight()}`);
   
   // Load Benzin-BOLD font for name (bolder, more prominent)
   let font;
   try {
     // Try to load Benzin-BOLD font if available
-    console.log(`🔤 Loading Benzin-BOLD font...`);
     font = await Jimp.loadFont(path.join(__dirname, 'fonts', 'benzin-bold.ttf'));
-    console.log(`✅ Benzin-BOLD font loaded successfully`);
   } catch (error) {
-    console.log(`⚠️ Benzin-BOLD font not found, using fallback font: ${error.message}`);
     // Fallback to a bolder built-in font
     font = await Jimp.loadFont(Jimp.FONT_SANS_64_WHITE);
-    console.log(`✅ Fallback font loaded`);
   }
   
   // Clone template to avoid modifying original
   const customTicket = template.clone();
-  console.log(`🔄 Template cloned for customization`);
-  
-  console.log(`🎨 Composing ticket elements...`);
-  console.log(`📍 QR code position: (${qrX}, ${qrY})`);
-  console.log(`📍 Name position: (${nameX}, ${nameY}) in box ${textBoxWidth}x${textBoxHeight}`);
-  console.log(`📝 Name text: "${ticket.nume.toUpperCase()}"`);
   
   // Composite QR code onto template
   customTicket.composite(qrImage, qrX, qrY);
-  console.log(`✅ QR code composited`);
   
   // Add name text centered in the text box (uppercase, white, bold)
   customTicket.print(font, nameX, nameY, {
@@ -922,12 +906,18 @@ async function generateCustomTicket(ticket) {
     alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER,
     alignmentY: Jimp.VERTICAL_ALIGN_MIDDLE
   }, textBoxWidth, textBoxHeight);
-  console.log(`✅ Name text rendered`);
+  
+  // Optimize image for preview (smaller size, faster loading)
+  if (isPreview) {
+    // Resize to max 1200px width for preview (maintains aspect ratio)
+    const maxWidth = 1200;
+    if (customTicket.getWidth() > maxWidth) {
+      customTicket.resize(maxWidth, Jimp.AUTO, Jimp.RESIZE_BEZIER);
+    }
+  }
   
   // Get buffer and return
-  console.log(`💾 Generating final image buffer...`);
   const buffer = await customTicket.getBufferAsync(Jimp.MIME_PNG);
-  console.log(`✅ Final image generated: ${buffer.length} bytes`);
   
   return buffer;
 }
@@ -935,23 +925,27 @@ async function generateCustomTicket(ticket) {
 // Endpoint for direct image download
 app.get('/api/tickets/:id/custom-public/image', async (req, res) => {
   try {
-    console.log(`🎫 Generating custom ticket image for ID: ${req.params.id}`);
-    
     const ticket = await Ticket.findById(req.params.id);
     if (!ticket) {
-      console.log(`❌ Ticket not found: ${req.params.id}`);
       return res.status(404).json({ error: 'Ticket not found' });
     }
 
-    console.log(`📋 Ticket found: ${ticket.nume} (${ticket.tip_bilet})`);
-    console.log(`🎫 Generating custom ticket for ${ticket.tip_bilet} ticket`);
-
-    const buffer = await generateCustomTicket(ticket);
+    // Check if preview version is requested (smaller, optimized for web viewing)
+    const isPreview = req.query.preview === 'true';
     
+    const buffer = await generateCustomTicket(ticket, isPreview);
+    
+    // Set caching headers to reduce server load (cache for 1 hour)
     res.set('Content-Type', 'image/png');
-    res.set('Content-Disposition', `attachment; filename="bilet-${ticket.nume}-${ticket._id}.png"`);
+    res.set('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+    res.set('ETag', `"${ticket._id}-${ticket.updated_at}"`); // ETag for conditional requests
+    
+    // Only set download header if not preview
+    if (!isPreview) {
+      res.set('Content-Disposition', `attachment; filename="bilet-${ticket.nume}-${ticket._id}.png"`);
+    }
+    
     res.send(buffer);
-    console.log(`🎉 Custom ticket generated successfully for ${ticket.nume}`);
     
   } catch (error) {
     console.error('❌ Custom ticket generation error:', error);
@@ -987,8 +981,8 @@ app.get('/api/tickets/:id/custom-public', async (req, res) => {
 
     console.log(`📋 Ticket found: ${ticket.nume} (${ticket.tip_bilet})`);
 
-    // Generate the ticket image as base64 for embedding
-    const buffer = await generateCustomTicket(ticket);
+    // Generate optimized preview version (smaller, faster loading) for embedding
+    const buffer = await generateCustomTicket(ticket, true); // true = preview mode
     const base64Image = buffer.toString('base64');
     const imageDataUrl = `data:image/png;base64,${base64Image}`;
 
@@ -1109,7 +1103,7 @@ app.get('/api/tickets/:id/custom-public', async (req, res) => {
           <h1>🎫 Biletul Tău</h1>
           
           <div class="ticket-preview">
-            <img src="${imageDataUrl}" alt="Bilet - ${ticket.nume}" />
+            <img src="${imageDataUrl}" alt="Bilet - ${ticket.nume}" loading="lazy" decoding="async" />
           </div>
           
           <div class="download-section">
