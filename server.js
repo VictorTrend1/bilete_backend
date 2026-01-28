@@ -117,6 +117,18 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
+// Helper function to normalize Romanian diacritical characters
+function normalizeRomanianDiacritics(text) {
+  if (!text) return text;
+  
+  return text
+    .replace(/ă/g, 'a').replace(/Ă/g, 'A')
+    .replace(/â/g, 'a').replace(/Â/g, 'A')
+    .replace(/î/g, 'i').replace(/Î/g, 'I')
+    .replace(/ș/g, 's').replace(/Ș/g, 'S')
+    .replace(/ț/g, 't').replace(/Ț/g, 'T');
+}
+
 // Bot Routes
 
 // Messaging service status endpoint
@@ -901,8 +913,10 @@ async function generateCustomTicket(ticket, isPreview = false) {
   customTicket.composite(qrImage, qrX, qrY);
   
   // Add name text centered in the text box (uppercase, white, bold)
+  // Normalize Romanian diacritical characters before displaying
+  const normalizedName = normalizeRomanianDiacritics(ticket.nume);
   customTicket.print(font, nameX, nameY, {
-    text: ticket.nume.toUpperCase(),
+    text: normalizedName.toUpperCase(),
     alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER,
     alignmentY: Jimp.VERTICAL_ALIGN_MIDDLE
   }, textBoxWidth, textBoxHeight);
@@ -942,7 +956,8 @@ app.get('/api/tickets/:id/custom-public/image', async (req, res) => {
     
     // Only set download header if not preview
     if (!isPreview) {
-      res.set('Content-Disposition', `attachment; filename="bilet-${ticket.nume}-${ticket._id}.png"`);
+      const normalizedNameForFile = normalizeRomanianDiacritics(ticket.nume);
+      res.set('Content-Disposition', `attachment; filename="bilet-${normalizedNameForFile}-${ticket._id}.png"`);
     }
     
     res.send(buffer);
@@ -1255,8 +1270,10 @@ app.get('/api/tickets/:id/custom-bal', authenticateToken, async (req, res) => {
     customTicket.composite(qrImage, qrX, qrY);
     
     // Add name text centered in the text box (uppercase, white, bold)
+    // Normalize Romanian diacritical characters before displaying
+    const normalizedName = normalizeRomanianDiacritics(ticket.nume);
     customTicket.print(font, nameX, nameY, {
-      text: ticket.nume.toUpperCase(),
+      text: normalizedName.toUpperCase(),
       alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER,
       alignmentY: Jimp.VERTICAL_ALIGN_MIDDLE
     }, textBoxWidth, textBoxHeight);
@@ -1265,7 +1282,8 @@ app.get('/api/tickets/:id/custom-bal', authenticateToken, async (req, res) => {
     const buffer = await customTicket.getBufferAsync(Jimp.MIME_PNG);
     
     res.set('Content-Type', 'image/png');
-    res.set('Content-Disposition', `attachment; filename="bilet-${ticket.nume}-${ticket._id}.png"`);
+    const normalizedNameForFile = normalizeRomanianDiacritics(ticket.nume);
+    res.set('Content-Disposition', `attachment; filename="bilet-${normalizedNameForFile}-${ticket._id}.png"`);
     res.send(buffer);
     
   } catch (error) {
@@ -1355,15 +1373,18 @@ app.get('/api/tickets/:id/custom-after', authenticateToken, async (req, res) => 
     console.log(`🎨 Composing AFTER ticket elements...`);
     console.log(`📍 QR code position: (${qrX}, ${qrY})`);
     console.log(`📍 Name position: (${nameX}, ${nameY}) in box ${textBoxWidth}x${textBoxHeight}`);
-    console.log(`📝 Name text: "${ticket.nume.toUpperCase()}"`);
+    const normalizedNameForLog = normalizeRomanianDiacritics(ticket.nume);
+    console.log(`📝 Name text: "${normalizedNameForLog.toUpperCase()}"`);
     
     // Composite QR code onto template
     customTicket.composite(qrImage, qrX, qrY);
     console.log(`✅ QR code composited`);
     
     // Add name text centered in the text box (uppercase, white, bold)
+    // Normalize Romanian diacritical characters before displaying
+    const normalizedName = normalizeRomanianDiacritics(ticket.nume);
     customTicket.print(font, nameX, nameY, {
-      text: ticket.nume.toUpperCase(),
+      text: normalizedName.toUpperCase(),
       alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER,
       alignmentY: Jimp.VERTICAL_ALIGN_MIDDLE
     }, textBoxWidth, textBoxHeight);
@@ -1375,7 +1396,8 @@ app.get('/api/tickets/:id/custom-after', authenticateToken, async (req, res) => 
     console.log(`✅ Final image generated: ${buffer.length} bytes`);
     
     res.set('Content-Type', 'image/png');
-    res.set('Content-Disposition', `attachment; filename="bilet-after-${ticket.nume}-${ticket._id}.png"`);
+    const normalizedNameForFile = normalizeRomanianDiacritics(ticket.nume);
+    res.set('Content-Disposition', `attachment; filename="bilet-after-${normalizedNameForFile}-${ticket._id}.png"`);
     res.send(buffer);
     console.log(`🎉 Custom AFTER ticket generated successfully for ${ticket.nume}`);
     
