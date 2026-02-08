@@ -773,22 +773,42 @@ async function generateCustomTicket(ticket, isPreview = false) {
     textBoxWidth = 941 - 72;  // 869 pixels wide
     textBoxHeight = 579 - 324; // 255 pixels tall
   } else if (ticket.tip_bilet === 'BAL + AFTER VIP') {
-    // Use BAL+AFTERVIP.png template for BAL + AFTER VIP tickets
-    templatePath = path.join(__dirname, 'BAL+AFTERVIP.png');
-    console.log(`📁 Loading BAL + AFTER VIP template from: ${templatePath}`);
-    
-    // Calculate QR code size (square from x1035, y252 to x1425, y642)
-    qrSize = 1425 - 1035; // 390 pixels
-    qrX = 1035;  // X position for QR code
-    qrY = 252;   // Y position for QR code
-    
-    // Position for name (from BAL + AFTER VIP.png template coordinates)
-    nameX = 72;   // X position for name (left edge of text box)
-    nameY = 318;  // Y position for name (top edge of text box)
-    
-    // Calculate text box dimensions for proper centering
-    textBoxWidth = 930 - 72;  // 858 pixels wide
-    textBoxHeight = 580 - 318; // 262 pixels tall
+    // Check if group is Carabella for custom template
+    if (ticket.group === 'Carabella') {
+      // Use bal-after-vip_cara.png template for Carabella BAL + AFTER VIP tickets
+      templatePath = path.join(__dirname, 'bal-after-vip_cara.png');
+      console.log(`📁 Loading Carabella BAL + AFTER VIP template from: ${templatePath}`);
+      
+      // QR code: square from (103, 316) to (529, 745)
+      qrSize = 529 - 103; // 426 pixels
+      qrX = 103;  // X position for QR code
+      qrY = 316;  // Y position for QR code
+      
+      // Name: from (795, 406) to (1309, 642)
+      nameX = 795;   // X position for name (left edge of text box)
+      nameY = 406;   // Y position for name (top edge of text box)
+      
+      // Calculate text box dimensions for proper centering
+      textBoxWidth = 1309 - 795;  // 514 pixels wide
+      textBoxHeight = 642 - 406;  // 236 pixels tall
+    } else {
+      // Use BAL+AFTERVIP.png template for BAL + AFTER VIP tickets
+      templatePath = path.join(__dirname, 'BAL+AFTERVIP.png');
+      console.log(`📁 Loading BAL + AFTER VIP template from: ${templatePath}`);
+      
+      // Calculate QR code size (square from x1035, y252 to x1425, y642)
+      qrSize = 1425 - 1035; // 390 pixels
+      qrX = 1035;  // X position for QR code
+      qrY = 252;   // Y position for QR code
+      
+      // Position for name (from BAL + AFTER VIP.png template coordinates)
+      nameX = 72;   // X position for name (left edge of text box)
+      nameY = 318;  // Y position for name (top edge of text box)
+      
+      // Calculate text box dimensions for proper centering
+      textBoxWidth = 930 - 72;  // 858 pixels wide
+      textBoxHeight = 580 - 318; // 262 pixels tall
+    }
   } else if (ticket.tip_bilet === 'AFTER VIP') {
     // Use AFTERVIP.png template for AFTER VIP tickets
     templatePath = path.join(__dirname, 'AFTERVIP.png');
@@ -807,7 +827,24 @@ async function generateCustomTicket(ticket, isPreview = false) {
     textBoxWidth = 930 - 72;  // 858 pixels wide
     textBoxHeight = 580 - 318; // 262 pixels tall
   } else if (ticket.tip_bilet === 'BAL') {
-    if(ticket.group === 'Bal10-11') {
+    if (ticket.group === 'Carabella') {
+      // Use bal_cara.png template for Carabella BAL tickets
+      templatePath = path.join(__dirname, 'bal_cara.png');
+      console.log(`📁 Loading Carabella BAL template from: ${templatePath}`);
+      
+      // QR code: square from (103, 316) to (529, 745)
+      qrSize = 529 - 103; // 426 pixels
+      qrX = 103;  // X position for QR code
+      qrY = 316;  // Y position for QR code
+      
+      // Name: from (795, 406) to (1309, 642)
+      nameX = 795;   // X position for name (left edge of text box)
+      nameY = 406;  // Y position for name (top edge of text box)
+      
+      // Calculate text box dimensions for proper centering
+      textBoxWidth = 1309 - 795;  // 514 pixels wide
+      textBoxHeight = 642 - 406;  // 236 pixels tall
+    } else if(ticket.group === 'Bal10-11') {
       // Use bal_tineret.jpeg template for Bal10-11 group
       templatePath = path.join(__dirname, 'bal_tineret.jpeg');
       console.log(`📁 Loading Bal10-11 template from: ${templatePath}`);
@@ -860,22 +897,42 @@ async function generateCustomTicket(ticket, isPreview = false) {
       textBoxHeight = 566 - 334; // 232 pixels tall
     }
   } else if (ticket.tip_bilet === 'BAL + AFTER') {
-    // Use BILET_AFTERbal.png template for BAL + AFTER tickets
-    templatePath = path.join(__dirname, 'BILET_AFTERbal.png');
-    console.log(`📁 Loading BAL + AFTER template from: ${templatePath}`);
-    
-    // Calculate QR code size (square from x1035, y252 to x1425, y642)
-    qrSize = 1425 - 1035; // 390 pixels
-    qrX = 1055;  // X position for QR code
-    qrY = 252;   // Y position for QR code
-    
-    // Position for name (from BILET_AFTERbal.png template coordinates)
-    nameX = 72;   // X position for name (left edge of text box)
-    nameY = 318;  // Y position for name (top edge of text box)
-    
-    // Calculate text box dimensions for proper centering
-    textBoxWidth = 930 - 72;  // 858 pixels wide
-    textBoxHeight = 580 - 318; // 262 pixels tall
+    // Check if group is Carabella for custom template
+    if (ticket.group === 'Carabella') {
+      // Use bal-after_cara.png template for Carabella BAL + AFTER tickets
+      templatePath = path.join(__dirname, 'bal-after_cara.png');
+      console.log(`📁 Loading Carabella BAL + AFTER template from: ${templatePath}`);
+      
+      // QR code: square from (103, 316) to (529, 745)
+      qrSize = 529 - 103; // 426 pixels
+      qrX = 103;  // X position for QR code
+      qrY = 316;  // Y position for QR code
+      
+      // Name: from (795, 406) to (1309, 642)
+      nameX = 795;   // X position for name (left edge of text box)
+      nameY = 406;   // Y position for name (top edge of text box)
+      
+      // Calculate text box dimensions for proper centering
+      textBoxWidth = 1309 - 795;  // 514 pixels wide
+      textBoxHeight = 642 - 406;  // 236 pixels tall
+    } else {
+      // Use BILET_AFTERbal.png template for BAL + AFTER tickets
+      templatePath = path.join(__dirname, 'BILET_AFTERbal.png');
+      console.log(`📁 Loading BAL + AFTER template from: ${templatePath}`);
+      
+      // Calculate QR code size (square from x1035, y252 to x1425, y642)
+      qrSize = 1425 - 1035; // 390 pixels
+      qrX = 1055;  // X position for QR code
+      qrY = 252;   // Y position for QR code
+      
+      // Position for name (from BILET_AFTERbal.png template coordinates)
+      nameX = 72;   // X position for name (left edge of text box)
+      nameY = 318;  // Y position for name (top edge of text box)
+      
+      // Calculate text box dimensions for proper centering
+      textBoxWidth = 930 - 72;  // 858 pixels wide
+      textBoxHeight = 580 - 318; // 262 pixels tall
+    }
   }
   
   const template = await Jimp.read(templatePath);
@@ -1196,9 +1253,12 @@ app.get('/api/tickets/:id/custom-bal', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Custom ticket generation only available for BAL tickets' });
     }
 
-    // Load the template image - use bal_carabella.png for Bal Carabella group
+    // Load the template image - use bal_cara.png for Carabella group, bal_carabella.png for Bal Carabella group
     let templatePath;
-    if (ticket.group === 'Bal Carabella') {
+    if (ticket.group === 'Carabella') {
+      templatePath = path.join(__dirname, 'bal_cara.png');
+      console.log(`📁 Loading Carabella BAL template from: ${templatePath}`);
+    } else if (ticket.group === 'Bal Carabella') {
       templatePath = path.join(__dirname, 'bal_carabella.png');
       console.log(`📁 Loading Bal Carabella BAL template from: ${templatePath}`);
     } else {
@@ -1210,7 +1270,19 @@ app.get('/api/tickets/:id/custom-bal', authenticateToken, async (req, res) => {
     // Calculate QR code size and positions based on group
     let qrSize, qrX, qrY, nameX, nameY, textBoxWidth, textBoxHeight;
     
-    if (ticket.group === 'Bal Carabella') {
+    if (ticket.group === 'Carabella') {
+      // Carabella template coordinates
+      // QR code: square from (103, 316) to (529, 745)
+      qrSize = 529 - 103; // 426 pixels
+      qrX = 103;  // X position for QR code
+      qrY = 316;  // Y position for QR code
+      
+      // Name: from (795, 406) to (1309, 642)
+      nameX = 795;   // X position for name (left edge of text box)
+      nameY = 406;  // Y position for name (top edge of text box)
+      textBoxWidth = 1309 - 795;  // 514 pixels wide
+      textBoxHeight = 642 - 406;  // 236 pixels tall
+    } else if (ticket.group === 'Bal Carabella') {
       // Bal Carabella template coordinates
       // QR code: between (102, 316) and (525, 741)
       qrSize = 525 - 102; // 423 pixels
