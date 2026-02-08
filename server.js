@@ -776,7 +776,7 @@ async function generateCustomTicket(ticket, isPreview = false) {
     // Check if group is Bal Carabella for custom template
     if (ticket.group === 'Bal Carabella') {
       // Use bal-after-vip_cara.png template for Bal Carabella BAL + AFTER VIP tickets
-      templatePath = path.join(__dirname, 'bal-after-vip_cara.png');
+      templatePath = path.join(__dirname, 'bal-after-vip_cara.jpeg');
       console.log(`📁 Loading Bal Carabella BAL + AFTER VIP template from: ${templatePath}`);
       
       // QR code: square from (103, 316) to (529, 745)
@@ -900,7 +900,7 @@ async function generateCustomTicket(ticket, isPreview = false) {
     // Check if group is Bal Carabella for custom template
     if (ticket.group === 'Bal Carabella') {
       // Use bal-after_cara.png template for Bal Carabella BAL + AFTER tickets
-      templatePath = path.join(__dirname, 'bal-after_cara.png');
+      templatePath = path.join(__dirname, 'bal-after_cara.jpeg');
       console.log(`📁 Loading Bal Carabella BAL + AFTER template from: ${templatePath}`);
       
       // QR code: square from (103, 316) to (529, 745)
@@ -917,7 +917,7 @@ async function generateCustomTicket(ticket, isPreview = false) {
       textBoxHeight = 642 - 406;  // 236 pixels tall
     } else {
       // Use BILET_AFTERbal.png template for BAL + AFTER tickets
-      templatePath = path.join(__dirname, 'BILET_AFTERbal.png');
+      templatePath = path.join(__dirname, 'BILET_AFTERbal.jpeg');
       console.log(`📁 Loading BAL + AFTER template from: ${templatePath}`);
       
       // Calculate QR code size (square from x1035, y252 to x1425, y642)
@@ -1256,7 +1256,7 @@ app.get('/api/tickets/:id/custom-bal', authenticateToken, async (req, res) => {
     // Load the template image - use bal_cara.png for Bal Carabella group
     let templatePath;
     if (ticket.group === 'Bal Carabella') {
-      templatePath = path.join(__dirname, 'bal_cara.png');
+      templatePath = path.join(__dirname, 'bal_cara.jpeg');
       console.log(`📁 Loading Bal Carabella BAL template from: ${templatePath}`);
     } else {
       templatePath = path.join(__dirname, 'model_bilet.jpg');
