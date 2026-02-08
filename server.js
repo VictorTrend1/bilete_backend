@@ -829,7 +829,7 @@ async function generateCustomTicket(ticket, isPreview = false) {
   } else if (ticket.tip_bilet === 'BAL') {
     if (ticket.group === 'Bal Carabella') {
       // Use bal_cara.png template for Bal Carabella BAL tickets
-      templatePath = path.join(__dirname, 'bal_cara.png');
+      templatePath = path.join(__dirname, 'bal_cara.jpeg');
       console.log(`📁 Loading Bal Carabella BAL template from: ${templatePath}`);
       
       // QR code: square from (103, 316) to (529, 745)
