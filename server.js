@@ -1067,6 +1067,16 @@ app.get('/api/tickets/:id/custom-public/image', async (req, res) => {
       return res.status(404).json({ error: 'Ticket not found' });
     }
 
+    // Check if ticket or group is inactive - don't generate ticket to save resources
+    const ticketActive = ticket.active !== undefined ? ticket.active : true;
+    const group = await Group.findOne({ name: ticket.group });
+    const groupActive = group ? group.active : true;
+    
+    if (!ticketActive || !groupActive) {
+      console.log(`⛔ Event ended - not generating ticket for ${ticket.nume} (saving resources)`);
+      return res.status(410).json({ error: 'Evenimentul s-a terminat. Biletul nu mai este disponibil.' });
+    }
+
     // Check if preview version is requested (smaller, optimized for web viewing)
     const isPreview = req.query.preview === 'true';
     
@@ -1119,16 +1129,19 @@ app.get('/api/tickets/:id/custom-public', async (req, res) => {
 
     console.log(`📋 Ticket found: ${ticket.nume} (${ticket.tip_bilet})`);
 
-    // Check if ticket or group is inactive
+    // Check if ticket or group is inactive - don't generate ticket to save resources
     const ticketActive = ticket.active !== undefined ? ticket.active : true;
     const group = await Group.findOne({ name: ticket.group });
     const groupActive = group ? group.active : true;
     const isInactive = !ticketActive || !groupActive;
 
-    // Generate optimized preview version (smaller, faster loading) for embedding
-    const buffer = await generateCustomTicket(ticket, true); // true = preview mode
-    const base64Image = buffer.toString('base64');
-    const imageDataUrl = `data:image/png;base64,${base64Image}`;
+    let imageDataUrl = '';
+    if (!isInactive) {
+      // Only generate ticket if event is still active
+      const buffer = await generateCustomTicket(ticket, true); // true = preview mode
+      const base64Image = buffer.toString('base64');
+      imageDataUrl = `data:image/png;base64,${base64Image}`;
+    }
 
     // Send HTML page with preview and download button
     const html = `
@@ -1290,6 +1303,7 @@ app.get('/api/tickets/:id/custom-public', async (req, res) => {
           </div>
           ` : ''}
           
+          ${!isInactive && imageDataUrl ? `
           <div class="ticket-preview">
             <img src="${imageDataUrl}" alt="Bilet - ${ticket.nume}" loading="lazy" decoding="async" />
           </div>
@@ -1303,6 +1317,17 @@ app.get('/api/tickets/:id/custom-public', async (req, res) => {
               <p><strong>Tip bilet:</strong> ${ticket.tip_bilet}</p>
             </div>
           </div>
+          ` : ''}
+          
+          ${isInactive ? `
+          <div class="download-section">
+            <p style="color: #999; font-style: italic; margin-top: 20px;">Biletul nu mai poate fi descărcat deoarece evenimentul s-a terminat.</p>
+            <div class="ticket-info">
+              <p><strong>Nume:</strong> ${ticket.nume}</p>
+              <p><strong>Tip bilet:</strong> ${ticket.tip_bilet}</p>
+            </div>
+          </div>
+          ` : ''}
           
           <div class="footer">
             <p><a href="/termeni.html" target="_blank">Termeni și Condiții</a></p>
@@ -1371,6 +1396,16 @@ app.get('/api/tickets/:id/custom-bal', authenticateToken, async (req, res) => {
     // Only generate custom ticket for BAL type
     if (ticket.tip_bilet !== 'BAL') {
       return res.status(400).json({ error: 'Custom ticket generation only available for BAL tickets' });
+    }
+
+    // Check if ticket or group is inactive - don't generate ticket to save resources
+    const ticketActive = ticket.active !== undefined ? ticket.active : true;
+    const group = await Group.findOne({ name: ticket.group });
+    const groupActive = group ? group.active : true;
+    
+    if (!ticketActive || !groupActive) {
+      console.log(`⛔ Event ended - not generating ticket for ${ticket.nume} (saving resources)`);
+      return res.status(410).json({ error: 'Evenimentul s-a terminat. Biletul nu mai este disponibil.' });
     }
 
     // Load the template image - use bal_cara.png for Bal Carabella group
@@ -1484,6 +1519,16 @@ app.get('/api/tickets/:id/custom-after', authenticateToken, async (req, res) => 
     if (ticket.tip_bilet !== 'AFTER') {
       console.log(`❌ Invalid ticket type: ${ticket.tip_bilet}, expected AFTER`);
       return res.status(400).json({ error: 'Custom ticket generation only available for AFTER tickets' });
+    }
+
+    // Check if ticket or group is inactive - don't generate ticket to save resources
+    const ticketActive = ticket.active !== undefined ? ticket.active : true;
+    const group = await Group.findOne({ name: ticket.group });
+    const groupActive = group ? group.active : true;
+    
+    if (!ticketActive || !groupActive) {
+      console.log(`⛔ Event ended - not generating ticket for ${ticket.nume} (saving resources)`);
+      return res.status(410).json({ error: 'Evenimentul s-a terminat. Biletul nu mai este disponibil.' });
     }
 
     console.log(`📋 Ticket found: ${ticket.nume} (${ticket.tip_bilet})`);
