@@ -1823,6 +1823,15 @@ app.post('/api/verify-ticket', async (req, res) => {
       return res.status(404).json({ error: 'Ticket not found' });
     }
 
+    // Check if ticket or group is inactive - don't allow verification
+    const ticketActive = ticket.active !== undefined ? ticket.active : true;
+    const group = await Group.findOne({ name: ticket.group });
+    const groupActive = group ? group.active : true;
+    
+    if (!ticketActive || !groupActive) {
+      return res.status(410).json({ error: 'Evenimentul s-a terminat. Biletul nu mai poate fi validat.' });
+    }
+
     // Increment verification count
     ticket.verification_count += 1;
     
@@ -1955,6 +1964,15 @@ app.post('/api/verify-ticket-by-phone', async (req, res) => {
     // Single ticket found - verify it directly
     const ticket = tickets[0];
     
+    // Check if ticket or group is inactive - don't allow verification
+    const ticketActive = ticket.active !== undefined ? ticket.active : true;
+    const group = await Group.findOne({ name: ticket.group });
+    const groupActive = group ? group.active : true;
+    
+    if (!ticketActive || !groupActive) {
+      return res.status(410).json({ error: 'Evenimentul s-a terminat. Biletul nu mai poate fi validat.' });
+    }
+    
     // Increment verification count
     ticket.verification_count += 1;
     
@@ -2028,6 +2046,15 @@ app.post('/api/verify-ticket-by-id/:id', async (req, res) => {
     
     if (!ticket) {
       return res.status(404).json({ error: 'Nu s-a găsit biletul' });
+    }
+
+    // Check if ticket or group is inactive - don't allow verification
+    const ticketActive = ticket.active !== undefined ? ticket.active : true;
+    const group = await Group.findOne({ name: ticket.group });
+    const groupActive = group ? group.active : true;
+    
+    if (!ticketActive || !groupActive) {
+      return res.status(410).json({ error: 'Evenimentul s-a terminat. Biletul nu mai poate fi validat.' });
     }
 
     // Increment verification count
