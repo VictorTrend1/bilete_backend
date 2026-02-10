@@ -250,6 +250,14 @@ app.post('/api/bot/send-ticket', authenticateToken, async (req, res) => {
             return res.status(503).json({ error: 'Messaging service is not ready. Please check configuration.' });
         }
         
+        // Check if user's group is active
+        const group = await Group.findOne({ name: req.user.group });
+        const groupActive = group ? group.active : true;
+        
+        if (!groupActive) {
+            return res.status(403).json({ error: 'Evenimentul s-a terminat. Nu mai poți trimite bilete.' });
+        }
+        
         // Get ticket details
         const ticket = await Ticket.findOne({ _id: ticketId, group: req.user.group });
         if (!ticket) {
@@ -285,6 +293,14 @@ app.post('/api/bot/send-bulk-tickets', authenticateToken, async (req, res) => {
         console.log('Messaging service status check:', serviceStatus);
         if (!serviceStatus.isReady) {
             return res.status(503).json({ error: 'Messaging service is not ready. Please check configuration.' });
+        }
+        
+        // Check if user's group is active
+        const group = await Group.findOne({ name: req.user.group });
+        const groupActive = group ? group.active : true;
+        
+        if (!groupActive) {
+            return res.status(403).json({ error: 'Evenimentul s-a terminat. Nu mai poți trimite bilete.' });
         }
         
         // Get tickets details
@@ -619,8 +635,22 @@ app.post('/api/login', async (req, res) => {
     if (!validPassword) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
+    
+    // Check if user's group is active
+    const group = await Group.findOne({ name: user.group });
+    const groupActive = group ? group.active : true; // Default to active if group not found in Group collection
+    
     const token = jwt.sign({ id: user._id, username: user.username, group: user.group }, JWT_SECRET, { expiresIn: '24h' });
-    res.json({ message: 'Login successful', token, user: { id: user._id, username: user.username, group: user.group } });
+    res.json({ 
+      message: 'Login successful', 
+      token, 
+      user: { 
+        id: user._id, 
+        username: user.username, 
+        group: user.group,
+        groupActive: groupActive
+      } 
+    });
   } catch (error) {
     res.status(500).json({ error: 'Server error' });
   }
@@ -632,6 +662,14 @@ app.post('/api/tickets', authenticateToken, async (req, res) => {
 
   if (!nume || !telefon || !tip_bilet) {
     return res.status(400).json({ error: 'All fields are required' });
+  }
+
+  // Check if user's group is active - if not, don't allow ticket creation
+  const group = await Group.findOne({ name: req.user.group });
+  const groupActive = group ? group.active : true;
+  
+  if (!groupActive) {
+    return res.status(403).json({ error: 'Evenimentul s-a terminat. Nu mai poți crea bilete noi.' });
   }
 
   const validTicketTypes = ['BAL + AFTER', 'BAL', 'AFTER', 'AFTER VIP', 'BAL + AFTER VIP'];
