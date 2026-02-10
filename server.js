@@ -59,7 +59,8 @@ mongoose.connect(process.env.MONGODB_URI || MONGODB_URI, {
 const userSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true, trim: true },
   password: { type: String, required: true },
-  group: { type: String, required: true, trim: true }
+  group: { type: String, required: true, trim: true },
+  active: { type: Boolean, default: true }
 }, { 
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
   collection: 'users_new' // Use a new collection to avoid index conflicts
@@ -84,7 +85,14 @@ const ticketSchema = new mongoose.Schema({
   }],
   flagged: { type: Boolean, default: false },
   sent: { type: Boolean, default: false },
-  sent_at: { type: Date }
+  sent_at: { type: Date },
+  active: { type: Boolean, default: true }
+}, { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
+
+const groupSchema = new mongoose.Schema({
+  name: { type: String, required: true, unique: true, trim: true },
+  active: { type: Boolean, default: true },
+  referral_code: { type: String, unique: true, sparse: true, trim: true }
 }, { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 
 
@@ -98,9 +106,10 @@ const GROUP_CODES = {
 
 const User = mongoose.model('User', userSchema);
 const Ticket = mongoose.model('Ticket', ticketSchema);
+const Group = mongoose.model('Group', groupSchema);
 
 // Authentication middleware
-const authenticateToken = (req, res, next) => {
+const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
@@ -108,10 +117,22 @@ const authenticateToken = (req, res, next) => {
     return res.status(401).json({ error: 'Access token required' });
   }
 
-  jwt.verify(token, JWT_SECRET, (err, user) => {
+  jwt.verify(token, JWT_SECRET, async (err, user) => {
     if (err) {
       return res.status(403).json({ error: 'Invalid token' });
     }
+    
+    // Check if user account is still active
+    try {
+      const dbUser = await User.findById(user.id);
+      if (!dbUser || dbUser.active === false) {
+        return res.status(403).json({ error: 'Contul tău a fost dezactivat. Contactează administratorul.' });
+      }
+    } catch (error) {
+      console.error('Error checking user status:', error);
+      return res.status(500).json({ error: 'Server error' });
+    }
+    
     req.user = user;
     next();
   });
@@ -588,6 +609,11 @@ app.post('/api/login', async (req, res) => {
     const user = await User.findOne({ username });
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    
+    // Check if user account is active
+    if (user.active === false) {
+      return res.status(403).json({ error: 'Contul tău a fost dezactivat. Contactează administratorul.' });
     }
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) {
@@ -1093,6 +1119,12 @@ app.get('/api/tickets/:id/custom-public', async (req, res) => {
 
     console.log(`📋 Ticket found: ${ticket.nume} (${ticket.tip_bilet})`);
 
+    // Check if ticket or group is inactive
+    const ticketActive = ticket.active !== undefined ? ticket.active : true;
+    const group = await Group.findOne({ name: ticket.group });
+    const groupActive = group ? group.active : true;
+    const isInactive = !ticketActive || !groupActive;
+
     // Generate optimized preview version (smaller, faster loading) for embedding
     const buffer = await generateCustomTicket(ticket, true); // true = preview mode
     const base64Image = buffer.toString('base64');
@@ -1194,6 +1226,43 @@ app.get('/api/tickets/:id/custom-public', async (req, res) => {
             font-size: 14px;
           }
           
+          .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+            text-align: center;
+            color: #999;
+            font-size: 12px;
+          }
+          
+          .footer a {
+            color: #667eea;
+            text-decoration: none;
+            transition: color 0.3s ease;
+          }
+          
+          .footer a:hover {
+            color: #764ba2;
+            text-decoration: underline;
+          }
+          
+          .event-ended-banner {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+            font-size: 18px;
+            font-weight: 600;
+          }
+          
+          .event-ended-banner i {
+            font-size: 24px;
+            margin-right: 10px;
+          }
+          
           @media (max-width: 768px) {
             .container {
               padding: 20px;
@@ -1214,6 +1283,13 @@ app.get('/api/tickets/:id/custom-public', async (req, res) => {
         <div class="container">
           <h1>🎫 Biletul Tău</h1>
           
+          ${isInactive ? `
+          <div class="event-ended-banner">
+            <i class="fas fa-exclamation-triangle"></i>
+            Evenimentul s-a terminat
+          </div>
+          ` : ''}
+          
           <div class="ticket-preview">
             <img src="${imageDataUrl}" alt="Bilet - ${ticket.nume}" loading="lazy" decoding="async" />
           </div>
@@ -1226,6 +1302,10 @@ app.get('/api/tickets/:id/custom-public', async (req, res) => {
               <p><strong>Nume:</strong> ${ticket.nume}</p>
               <p><strong>Tip bilet:</strong> ${ticket.tip_bilet}</p>
             </div>
+          </div>
+          
+          <div class="footer">
+            <p><a href="/termeni.html" target="_blank">Termeni și Condiții</a></p>
           </div>
         </div>
       </body>
@@ -1944,7 +2024,12 @@ app.delete('/api/tickets/:id', authenticateToken, async (req, res) => {
 // Get all tickets (for admin/organizer view)
 app.get('/api/admin/tickets', authenticateToken, async (req, res) => {
   try {
-    const tickets = await Ticket.find({}).sort({ created_at: 1 }).populate('user_id', 'username');
+    // Check if user is Administrator
+    if (req.user.group !== 'Administrator') {
+      return res.status(403).json({ error: 'Access denied. Administrator access required.' });
+    }
+    
+    const tickets = await Ticket.find({}).sort({ created_at: -1 }).populate('user_id', 'username');
     res.json({ tickets });
   } catch (error) {
     res.status(500).json({ error: 'Database error' });
@@ -1977,6 +2062,7 @@ app.get('/api/admin/tickets-logs/:group', authenticateToken, async (req, res) =>
       verified: ticket.verified,
       verification_count: ticket.verification_count,
       sent: ticket.sent,
+      active: ticket.active !== undefined ? ticket.active : true,
       created_at: ticket.created_at,
       creator_username: ticket.user_id ? ticket.user_id.username : 'Unknown',
       creator_id: ticket.user_id ? ticket.user_id._id : null
@@ -1990,6 +2076,177 @@ app.get('/api/admin/tickets-logs/:group', authenticateToken, async (req, res) =>
     });
   } catch (error) {
     console.error('Error fetching ticket logs:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Admin Tools - Get all groups
+app.get('/api/admin/groups', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.group !== 'Administrator') {
+      return res.status(403).json({ error: 'Access denied. Administrator access required.' });
+    }
+
+    const groups = await Group.find({}).sort({ name: 1 });
+    
+    // Also get groups from existing tickets (for backward compatibility)
+    const existingGroups = await Ticket.distinct('group');
+    const allGroupNames = new Set([...groups.map(g => g.name), ...existingGroups]);
+    
+    // Create group objects for groups that don't exist in Group collection
+    const groupList = Array.from(allGroupNames).map(name => {
+      const dbGroup = groups.find(g => g.name === name);
+      return dbGroup || { name, active: true, _id: null };
+    });
+
+    res.json({ success: true, groups: groupList });
+  } catch (error) {
+    console.error('Error fetching groups:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Admin Tools - Create new group
+app.post('/api/admin/groups', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.group !== 'Administrator') {
+      return res.status(403).json({ error: 'Access denied. Administrator access required.' });
+    }
+
+    const { name, referral_code } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Group name is required' });
+    }
+
+    // Check if group already exists
+    const existingGroup = await Group.findOne({ name: name.trim() });
+    if (existingGroup) {
+      return res.status(400).json({ error: 'Group already exists' });
+    }
+
+    const groupData = { name: name.trim(), active: true };
+    if (referral_code && referral_code.trim()) {
+      groupData.referral_code = referral_code.trim();
+    }
+
+    const newGroup = await Group.create(groupData);
+    res.json({ success: true, group: newGroup });
+  } catch (error) {
+    console.error('Error creating group:', error);
+    if (error.code === 11000) {
+      return res.status(400).json({ error: 'Group name or referral code already exists' });
+    }
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Admin Tools - Update group status (activate/deactivate)
+app.put('/api/admin/groups/:name/status', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.group !== 'Administrator') {
+      return res.status(403).json({ error: 'Access denied. Administrator access required.' });
+    }
+
+    const { name } = req.params;
+    const { active } = req.body;
+
+    if (typeof active !== 'boolean') {
+      return res.status(400).json({ error: 'Active status (true/false) is required' });
+    }
+
+    // Update or create group
+    const group = await Group.findOneAndUpdate(
+      { name: name },
+      { active: active },
+      { upsert: true, new: true }
+    );
+
+    res.json({ success: true, group });
+  } catch (error) {
+    console.error('Error updating group status:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Admin Tools - Update ticket status (activate/deactivate)
+app.put('/api/admin/tickets/:id/status', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.group !== 'Administrator') {
+      return res.status(403).json({ error: 'Access denied. Administrator access required.' });
+    }
+
+    const { id } = req.params;
+    const { active } = req.body;
+
+    if (typeof active !== 'boolean') {
+      return res.status(400).json({ error: 'Active status (true/false) is required' });
+    }
+
+    const ticket = await Ticket.findByIdAndUpdate(
+      id,
+      { active: active },
+      { new: true }
+    );
+
+    if (!ticket) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+
+    res.json({ success: true, ticket });
+  } catch (error) {
+    console.error('Error updating ticket status:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Admin Tools - Get all users
+app.get('/api/admin/users', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.group !== 'Administrator') {
+      return res.status(403).json({ error: 'Access denied. Administrator access required.' });
+    }
+
+    const users = await User.find({}).select('-password').sort({ created_at: -1 });
+    res.json({ success: true, users });
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Admin Tools - Update user status (activate/deactivate account)
+app.put('/api/admin/users/:id/status', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.group !== 'Administrator') {
+      return res.status(403).json({ error: 'Access denied. Administrator access required.' });
+    }
+
+    const { id } = req.params;
+    const { active } = req.body;
+
+    if (typeof active !== 'boolean') {
+      return res.status(400).json({ error: 'Active status (true/false) is required' });
+    }
+
+    // Prevent deactivating own account
+    if (id === req.user.id && !active) {
+      return res.status(400).json({ error: 'Nu poți dezactiva propriul cont' });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      id,
+      { active: active },
+      { new: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ success: true, user });
+  } catch (error) {
+    console.error('Error updating user status:', error);
     res.status(500).json({ error: 'Database error' });
   }
 });
